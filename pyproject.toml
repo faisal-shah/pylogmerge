@@ -29,9 +29,6 @@ dev = [
 [project.scripts]
 logmerge = "logmerge.main:main"
 
-[project.gui-scripts]
-logmerge-gui = "logmerge.main:main"
-
 [tool.setuptools.dynamic]
 version = { attr = "logmerge.__version__" }
 
