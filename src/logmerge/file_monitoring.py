@@ -162,7 +162,7 @@ class LogParsingWorker(QThread):
             # Read new lines
             new_lines = state.file_handle.readlines()
             
-            for line in new_lines:
+            for i, line in enumerate(new_lines):
                 line = line.strip()
                 if not line:
                     continue

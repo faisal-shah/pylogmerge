@@ -9,6 +9,7 @@ Example log format:
 Chn Identifier Flg   DLC  D0...1...2...3...4...5...6..D7       Time     Dir
  0    0000014B         1  00                                1675.570498 T
  0    00000065         5  01  00  00  00  00                1675.572378 T
+ 0    00002102 X       8  60  00  00  5F  60  60  E2  F2   46055.090598 R
 """
 
 import re
@@ -27,7 +28,7 @@ logger = get_logger(__name__)
 
 # Schema definition for CAN King log format
 SCHEMA = {
-    "regex": r"^\s*(?P<channel>\d+)\s+(?P<identifier>[0-9A-Fa-f]+)\s+(?P<dlc>\d+)\s+(?P<data>(?:[0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)?)\s+(?P<timestamp>\d+\.\d+)\s+(?P<direction>[TR])\s*$",
+    "regex": r"^\s*(?P<channel>\d+)\s+(?P<identifier>[0-9A-Fa-f]+)\s*(?P<flag>[A-Z]?)\s+(?P<dlc>\d+)\s+(?P<data>(?:[0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)?)\s+(?P<timestamp>\d+\.\d+)\s+(?P<direction>[TR])\s*$",
     "timestamp_field": "timestamp", 
     "fields": [
         {
@@ -36,6 +37,11 @@ SCHEMA = {
         },
         {
             "name": "identifier",
+            "type": "string",
+            "is_discrete": True
+        },
+        {
+            "name": "flag",
             "type": "string",
             "is_discrete": True
         },
@@ -78,10 +84,14 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
         Dictionary with fully converted field values (ready for display), or None if parsing fails
         
     Example log line:
-        " 0    0000014B         1  00                                1675.570498 T"        Expected return:
+        " 0    0000014B         1  00                                1675.570498 T"
+        " 0    00002102 X       8  60  00  00  5F  60  60  E2  F2   46055.090598 R"
+        
+    Expected return:
         {
             'channel': 0,                    # int
             'identifier': '0000014B',        # string (hex ID)
+            'flag': '',                      # string (flag character or empty)
             'dlc': 1,                        # int (data length)
             'data': '00',                    # string (hex data bytes)
             'timestamp': datetime(...),      # datetime object
@@ -112,6 +122,9 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
         
         # Identifier as uppercase hex string
         identifier = groups['identifier'].upper()
+        
+        # Flag field (can be empty)
+        flag = groups['flag'] if groups['flag'] else ''
         
         # Parse and convert DLC to int
         dlc = int(groups['dlc'])
@@ -148,6 +161,7 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
         result = {
             'channel': channel,           # int
             'identifier': identifier,     # string (hex)
+            'flag': flag,                # string (flag character)
             'dlc': dlc,                  # int
             'data': data,                # string (formatted hex)
             'timestamp': timestamp,       # datetime object
