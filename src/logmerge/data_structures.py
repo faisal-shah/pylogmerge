@@ -23,7 +23,7 @@ class LogEntry(NamedTuple):
 class SharedLogBuffer:
     """High-performance shared buffer for log entries between threads."""
     
-    def __init__(self, max_size: int = 10000):
+    def __init__(self, max_size: int = 10000000):
         self.buffer = deque(maxlen=max_size)
         self.lock = threading.Lock()
         
