@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools >= 64.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+dynamic = ["version"]
+name = "logmerge"
+requires-python = ">= 3.10"
+dependencies = [
+    "PyQt5",
+]
+readme = "README.md"
+authors = [
+  {name = "Faisal Shah", email = "faisal.shah@gmail.com"},
+]
+maintainers = [
+  {name = "Faisal Shah", email = "faisal.shah@gmail.com"},
+]
+description = "A GUI application for viewing and analyzing multiple log files with advanced filtering and merging capabilities"
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "black",
+  "ruff",
+  "mypy",
+]
+
+[project.scripts]
+logmerge = "logmerge.main:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "logmerge.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+logmerge = ["*.py"]
+"logmerge.plugins" = ["*.py"]
+exclude = ["tests/*", "utils/*"]
