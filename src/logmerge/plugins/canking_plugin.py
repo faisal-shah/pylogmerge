@@ -25,7 +25,6 @@ from logging_config import get_logger
 # Get logger for this plugin
 logger = get_logger(__name__)
 
-
 # Schema definition for CAN King log format
 SCHEMA = {
     "regex": r"^\s*(?P<channel>\d+)\s+(?P<identifier>[0-9A-Fa-f]+)\s*(?P<flag>[A-Z]?)\s+(?P<dlc>\d+)\s+(?P<data>(?:[0-9A-Fa-f]{2}(?:\s+[0-9A-Fa-f]{2})*)?)\s+(?P<timestamp>\d+\.\d+)\s+(?P<direction>[TR])\s*$",
@@ -69,6 +68,12 @@ SCHEMA = {
     ]
 }
 
+# Pre-compiled regex for maximum performance - get pattern from schema to avoid duplication
+_COMPILED_REGEX = re.compile(SCHEMA["regex"])
+
+# Pre-compiled direction mapping for performance - avoid runtime list iteration
+_DIRECTION_MAP = {'T': 'TRANSMIT', 'R': 'RECEIVE'}
+
 
 def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
     """
@@ -103,14 +108,15 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
     if not line:
         return None
         
-    # Skip header lines
-    if line.startswith('Chn') or line.startswith('---') or 'Identifier' in line:
+    # Skip header lines - optimized for performance
+    # Check first character for quick rejection of header lines
+    first_char = line[0] if line else ''
+    if first_char in ('C', '-') or (first_char.isalpha() and 'Identifier' in line):
         return None
     
     try:
-        # Use the regex pattern from SCHEMA to avoid duplication
-        pattern = SCHEMA["regex"]
-        match = re.match(pattern, line)
+        # Use pre-compiled regex for maximum performance
+        match = _COMPILED_REGEX.match(line)
         
         if not match:
             return None
@@ -129,13 +135,10 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
         # Parse and convert DLC to int
         dlc = int(groups['dlc'])
         
-        # Clean up data bytes - remove extra spaces and format consistently
-        data_raw = groups['data'] if groups['data'] else ''
+        # Optimize data bytes processing - single pass operation
+        data_raw = groups['data']
         if data_raw:
-            data_raw = data_raw.strip()
-            # Split by whitespace and rejoin with single spaces
-            data_bytes = data_raw.split()
-            data = ' '.join(byte.upper() for byte in data_bytes)
+            data = ' '.join(data_raw.upper().split())
         else:
             data = ''
         
@@ -147,15 +150,9 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
         base_time = datetime(2025, 6, 11, 0, 0, 0)  # Adjust this base time as needed
         timestamp = base_time + timedelta(seconds=timestamp_float)
         
-        # Convert direction enum
+        # Convert direction enum using pre-compiled mapping
         direction_char = groups['direction']
-        direction_field = next((field for field in SCHEMA['fields'] if field['name'] == 'direction'), None)
-        if direction_field and direction_field['type'] == 'enum':
-            enum_values = direction_field.get('enum_values', [])
-            direction_enum_map = {item['value']: item['name'] for item in enum_values}
-            direction = direction_enum_map.get(direction_char, direction_char)
-        else:
-            direction = direction_char  # Fallback
+        direction = _DIRECTION_MAP.get(direction_char, direction_char)
         
         # Return fully converted values ready for display
         result = {
