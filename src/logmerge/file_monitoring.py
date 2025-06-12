@@ -162,11 +162,7 @@ class LogParsingWorker(QThread):
             # Read new lines
             new_lines = state.file_handle.readlines()
             
-            for line in new_lines:
-                line = line.strip()
-                if not line:
-                    continue
-                    
+            for line in new_lines:                    
                 # Increment line counter
                 state.stats.total_lines += 1
                 line_number = state.stats.total_lines
