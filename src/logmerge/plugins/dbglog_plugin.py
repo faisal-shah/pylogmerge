@@ -12,6 +12,11 @@ The parse_raw_line function takes precedence over the regex pattern when provide
 import re
 from datetime import datetime
 from typing import Dict, Optional, Any
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from logging_config import get_logger
+
+# Get logger for this plugin
+logger = get_logger(__name__)
 
 
 # Schema definition for debug log format

@@ -162,7 +162,7 @@ class LogParsingWorker(QThread):
             # Read new lines
             new_lines = state.file_handle.readlines()
             
-            for i, line in enumerate(new_lines):
+            for line in new_lines:
                 line = line.strip()
                 if not line:
                     continue
@@ -226,10 +226,8 @@ class LogParsingWorker(QThread):
             
             # Extract timestamp from the designated timestamp field
             # By contract, both regex and plugin parsers return datetime objects for timestamp fields
-            timestamp = None
-            if self.schema.timestamp_field and self.schema.timestamp_field in parsed_fields:
-                timestamp = parsed_fields[self.schema.timestamp_field]
-                                
+            timestamp = parsed_fields.get(self.schema.timestamp_field, None)
+                               
             # Use current time if no timestamp found
             if timestamp is None:
                 timestamp = datetime.now()
