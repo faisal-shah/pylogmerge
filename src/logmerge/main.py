@@ -30,7 +30,7 @@ from PyQt5.QtWidgets import (
     QSplitter, QPushButton, QListWidget, QListWidgetItem, QFileDialog,
     QCheckBox, QLabel, QFrame, QMessageBox, QDialog, QTabWidget,
     QLineEdit, QTextEdit, QDialogButtonBox, QTableView, QHeaderView,
-    QToolBar, QAction
+    QToolBar, QAction, QScrollArea, QComboBox
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QThread, QAbstractTableModel, QModelIndex, QVariant, QTimer
 from PyQt5.QtGui import QIcon, QColor, QPalette
@@ -59,8 +59,6 @@ COLOR_LIGHTEN_FACTOR = 0.9      # Factor for lightening background colors
 
 # UI Layout Constants
 MAIN_WINDOW_DEFAULT_GEOMETRY = (100, 100, 1200, 800)  # x, y, width, height
-SIDEBAR_MIN_WIDTH = 250
-SIDEBAR_MAX_WIDTH = 400
 DEFAULT_SPLITTER_SIZES = [300, 900]  # Sidebar width, main view width
 
 # Dialog Dimensions
@@ -97,7 +95,7 @@ PREVIEW_FILES_TEXT = "Preview Matching Files..."
 ADD_SELECTED_TEXT = "Add >"
 ADD_ALL_TEXT = "Add All >>"
 REMOVE_SELECTED_TEXT = "< Remove"
-REMOVE_ALL_TEXT = "<< Remove All"
+REMOVE_ALL_TEXT = "<< Remove"
 MOVE_UP_TEXT = "Move Up"
 MOVE_DOWN_TEXT = "Move Down"
 ADD_ALL_FILES_TEXT = "Add All Files"
@@ -256,6 +254,394 @@ UNRECOGNIZED_ENUM_FORMAT = "UNRECOGNIZED_{value}"
 
 # Summary Text Formats
 FILES_FOUND_SUMMARY_FORMAT = "Found {count} files matching pattern '{pattern}' in directory '{directory}'"
+
+
+# Removed filtering constants
+
+# Activity Bar Constants
+ACTIVITY_BAR_WIDTH = 50  # Width of the permanent left activity bar
+ACTIVITY_BAR_BUTTON_SIZE = 40  # Size of activity bar icon buttons
+ACTIVITY_BAR_SPACING = 5  # Spacing between buttons
+
+# Activity Bar Button Text and Tooltips
+FILES_ACTIVITY_BUTTON_TEXT = "📁"
+FILES_ACTIVITY_TOOLTIP = "Show/hide file picker panel"
+
+# Activity Bar Button States
+ACTIVITY_BUTTON_INACTIVE_STYLE = """
+QPushButton {
+    background-color: transparent;
+    border: none;
+    font-size: 20px;
+    padding: 8px;
+    border-radius: 4px;
+}
+QPushButton:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+"""
+
+ACTIVITY_BUTTON_ACTIVE_STYLE = """
+QPushButton {
+    background-color: rgba(255, 255, 255, 0.2);
+    border: none;
+    font-size: 20px;
+    padding: 8px;
+    border-radius: 4px;
+    border-left: 3px solid #0078d4;
+}
+QPushButton:hover {
+    background-color: rgba(255, 255, 255, 0.25);
+}
+"""
+
+# Panel Constants
+PANEL_MIN_WIDTH = 250  # Minimum width for panels
+PANEL_MAX_WIDTH = 400  # Maximum width for panels
+
+# Panel Labels 
+FILES_PANEL_PLACEHOLDER = "📁 File Picker Panel\n\n(Content will be moved here in Stage 3)"
+
+
+class ActivityBar(QWidget):
+    """VS Code-style permanent left activity bar with toggleable icon buttons."""
+    
+    # Signals for button state changes
+    files_button_clicked = pyqtSignal(bool)  # True = active, False = inactive
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.active_button = None  # Track which button is currently active
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Set up the activity bar UI with icon buttons."""
+        # Set fixed width for the activity bar
+        self.setFixedWidth(ACTIVITY_BAR_WIDTH)
+        self.setMinimumHeight(100)  # Minimum height to contain buttons
+        
+        # Main vertical layout
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(ACTIVITY_BAR_SPACING, ACTIVITY_BAR_SPACING, 
+                                ACTIVITY_BAR_SPACING, ACTIVITY_BAR_SPACING)
+        layout.setSpacing(ACTIVITY_BAR_SPACING)
+        
+        # Files button (📁)
+        self.files_button = QPushButton(FILES_ACTIVITY_BUTTON_TEXT)
+        self.files_button.setToolTip(FILES_ACTIVITY_TOOLTIP)
+        self.files_button.setFixedSize(ACTIVITY_BAR_BUTTON_SIZE, ACTIVITY_BAR_BUTTON_SIZE)
+        self.files_button.setStyleSheet(ACTIVITY_BUTTON_INACTIVE_STYLE)
+        self.files_button.clicked.connect(self.on_files_button_clicked)
+        layout.addWidget(self.files_button)
+        
+        # Add stretch to push buttons to the top
+        layout.addStretch()
+        
+        # Set background color for the activity bar
+        self.setStyleSheet("""
+            ActivityBar {
+                background-color: #2d2d30;
+                border-right: 1px solid #3e3e42;
+            }
+        """)
+    
+    def on_files_button_clicked(self):
+        """Handle files button click."""
+        if self.active_button == 'files':
+            # Clicking active button deactivates it
+            self.set_active_button(None)
+        else:
+            # Activate files button
+            self.set_active_button('files')
+    
+    def set_active_button(self, button_name):
+        """Set which button is active and update styles accordingly."""
+        # Update internal state
+        previous_button = self.active_button
+        self.active_button = button_name
+        
+        # Update button styles
+        if button_name == 'files':
+            self.files_button.setStyleSheet(ACTIVITY_BUTTON_ACTIVE_STYLE)
+        else:  # None - deactivate all
+            self.files_button.setStyleSheet(ACTIVITY_BUTTON_INACTIVE_STYLE)
+        
+        # Emit signals for state changes
+        if previous_button != button_name:
+            # Emit deactivation signal for previous button
+            if previous_button == 'files':
+                self.files_button_clicked.emit(False)
+            
+            # Emit activation signal for new button
+            if button_name == 'files':
+                self.files_button_clicked.emit(True)
+    
+    def get_active_button(self):
+        """Return the name of the currently active button or None."""
+        return self.active_button
+
+
+class BasePanel(QWidget):
+    """Abstract base class for activity bar panels."""
+    
+    def __init__(self, panel_name: str, parent=None):
+        super().__init__(parent)
+        self.panel_name = panel_name
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Set up the panel UI - to be implemented by subclasses."""
+        raise NotImplementedError("Subclasses must implement setup_ui()")
+    
+    def get_panel_name(self) -> str:
+        """Return the panel name."""
+        return self.panel_name
+
+
+class FilePickerPanel(BasePanel):
+    """Panel for file picker functionality - contains all file management controls."""
+    
+    files_changed = pyqtSignal()  # Signal emitted when file list changes
+    
+    def __init__(self, parent=None):
+        super().__init__("files", parent)
+    
+    def setup_ui(self):
+        """Set up the file picker panel UI."""
+        self.setMinimumWidth(PANEL_MIN_WIDTH)
+        self.setMaximumWidth(PANEL_MAX_WIDTH)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(*SIDEBAR_CONTENT_MARGINS)
+        
+        # Title
+        title_label = QLabel(LOG_FILES_TITLE)
+        title_label.setStyleSheet(TITLE_LABEL_STYLE)
+        layout.addWidget(title_label)
+        
+        # Select All / Deselect All buttons
+        button_layout = QHBoxLayout()
+        
+        self.select_all_btn = QPushButton(SELECT_ALL_TEXT)
+        self.select_all_btn.clicked.connect(self.select_all_files)
+        button_layout.addWidget(self.select_all_btn)
+        
+        self.deselect_all_btn = QPushButton(DESELECT_ALL_TEXT)
+        self.deselect_all_btn.clicked.connect(self.deselect_all_files)
+        button_layout.addWidget(self.deselect_all_btn)
+        
+        layout.addLayout(button_layout)
+        
+        # File list
+        self.file_list = FileListWidget()
+        self.file_list.checkbox_changed.connect(self.files_changed.emit)
+        layout.addWidget(self.file_list, 1)  # Stretch to fill available space
+        
+        # Add/Remove buttons
+        control_layout = QHBoxLayout()
+        
+        self.add_btn = QPushButton(ADD_BUTTON_EMOJI)
+        self.add_btn.setToolTip(ADD_FILES_TOOLTIP)
+        self.add_btn.clicked.connect(self.add_files)
+        control_layout.addWidget(self.add_btn)
+        
+        self.remove_btn = QPushButton(REMOVE_BUTTON_EMOJI)
+        self.remove_btn.setToolTip(REMOVE_FILES_TOOLTIP)
+        self.remove_btn.clicked.connect(self.remove_selected_files)
+        control_layout.addWidget(self.remove_btn)
+        
+        control_layout.addStretch()  # Push buttons to the left
+        
+        layout.addLayout(control_layout)
+        
+        # Enable keyboard shortcuts
+        self.file_list.keyPressEvent = self.handle_key_press
+        
+        # Set panel background
+        self.setStyleSheet("""
+            FilePickerPanel {
+                background-color: #fafafa;
+                border-right: 1px solid #ddd;
+            }
+        """)
+    
+    def handle_key_press(self, event):
+        """Handle keyboard events for the file list."""
+        if event.key() == Qt.Key_Delete:
+            self.remove_selected_files()
+        else:
+            # Call the original keyPressEvent
+            QListWidget.keyPressEvent(self.file_list, event)
+    
+    def add_files(self):
+        """Open tabbed dialog to add log files."""
+        dialog = AddFilesDialog(self)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            file_paths = dialog.selected_files
+            existing_files = self.get_all_files()
+            added_files = []
+            skipped_files = []
+            
+            for file_path in file_paths:
+                # Normalize path for comparison
+                normalized_path = str(Path(file_path).resolve())
+                
+                # Check if file is already in the list
+                already_exists = any(
+                    str(Path(existing_file).resolve()) == normalized_path 
+                    for existing_file in existing_files
+                )
+                
+                if not already_exists:
+                    self.file_list.add_log_file(file_path)
+                    added_files.append(file_path)
+                else:
+                    skipped_files.append(Path(file_path).name)
+            
+            # Show message if some files were skipped
+            if skipped_files:
+                if len(skipped_files) == 1:
+                    message = DUPLICATE_FILE_MESSAGE_SINGLE.format(file=skipped_files[0])
+                else:
+                    message = DUPLICATE_FILES_MESSAGE_MULTIPLE.format(count=len(skipped_files))
+                
+                QMessageBox.information(self, DUPLICATE_FILES_DIALOG_TITLE, message)
+            
+            if added_files:
+                self.files_changed.emit()
+    
+    def remove_selected_files(self):
+        """Remove currently selected files from the list."""
+        selected_items = self.file_list.selectedItems()
+        if not selected_items:
+            return
+        
+        # Confirm removal if multiple files selected
+        if len(selected_items) > 1:
+            reply = QMessageBox.question(
+                self, 
+                REMOVE_FILES_DIALOG_TITLE,
+                REMOVE_MULTIPLE_FILES_CONFIRM.format(count=len(selected_items)),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+        
+        # Remove items in reverse order to avoid index issues
+        for item in reversed(selected_items):
+            row = self.file_list.row(item)
+            self.file_list.takeItem(row)
+        
+        self.files_changed.emit()
+    
+    def select_all_files(self):
+        """Check all files in the list."""
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            widget = self.file_list.itemWidget(item)
+            if isinstance(widget, FileListItemWidget):
+                widget.set_checked(True)
+    
+    def deselect_all_files(self):
+        """Uncheck all files in the list."""
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            widget = self.file_list.itemWidget(item)
+            if isinstance(widget, FileListItemWidget):
+                widget.set_checked(False)
+    
+    def get_checked_files(self) -> List[str]:
+        """Return list of file paths that are currently checked."""
+        checked_files = []
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            widget = self.file_list.itemWidget(item)
+            if isinstance(widget, FileListItemWidget) and widget.is_checked():
+                checked_files.append(widget.file_path)
+        return checked_files
+    
+    def get_all_files(self) -> List[str]:
+        """Return list of all file paths (checked and unchecked)."""
+        all_files = []
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            widget = self.file_list.itemWidget(item)
+            if isinstance(widget, FileListItemWidget):
+                all_files.append(widget.file_path)
+        return all_files
+
+
+
+
+
+class PanelContainer(QWidget):
+    """Container widget that manages showing/hiding panels."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.current_panel = None
+        self.panels = {}
+        self.setup_ui()
+    
+    def setup_ui(self):
+        """Set up the panel container."""
+        # Use a layout that allows us to show/hide panels
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(0)
+        
+        # Initially hidden
+        self.hide()
+    
+    def add_panel(self, panel: BasePanel):
+        """Add a panel to the container."""
+        panel_name = panel.get_panel_name()
+        self.panels[panel_name] = panel
+        # Don't add to layout yet - we'll show/hide as needed
+        panel.setParent(self)
+        panel.hide()
+    
+    def show_panel(self, panel_name: str):
+        """Show the specified panel and hide others."""
+        if panel_name not in self.panels:
+            return
+        
+        # Hide current panel if any
+        if self.current_panel:
+            self.current_panel.hide()
+            self.layout.removeWidget(self.current_panel)
+        
+        # Show new panel
+        new_panel = self.panels[panel_name]
+        self.layout.addWidget(new_panel)
+        new_panel.show()
+        self.current_panel = new_panel
+        
+        # Show the container itself and ensure it has proper width
+        self.show()
+        
+        # Request minimum width from the panel being shown
+        if hasattr(new_panel, 'minimumWidth'):
+            self.setMinimumWidth(new_panel.minimumWidth())
+    
+    def hide_panel(self):
+        """Hide the currently visible panel."""
+        if self.current_panel:
+            self.current_panel.hide()
+            self.layout.removeWidget(self.current_panel)
+            self.current_panel = None
+        
+        # Hide the container itself
+        self.hide()
+        self.setMinimumWidth(0)
+    
+    def get_current_panel_name(self) -> Optional[str]:
+        """Return the name of the currently visible panel, or None."""
+        if self.current_panel:
+            return self.current_panel.get_panel_name()
+        return None
 
 
 class LogTableModel(QAbstractTableModel):
@@ -739,173 +1125,6 @@ class FileListItemWidget(QWidget):
         """Set the color of the file indicator."""
         self.color = color
         self.color_label.setStyleSheet(COLOR_INDICATOR_STYLE_TEMPLATE.format(color=color.name()))
-
-
-class LogViewerSidebar(QWidget):
-    """Sidebar widget containing file management controls and file list."""
-    
-    files_changed = pyqtSignal()  # Signal emitted when file list changes
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setup_ui()
-        
-    def setup_ui(self):
-        """Set up the sidebar UI components."""
-        layout = QVBoxLayout()
-        layout.setContentsMargins(*SIDEBAR_CONTENT_MARGINS)
-        
-        # Title
-        title_label = QLabel(LOG_FILES_TITLE)
-        title_label.setStyleSheet(TITLE_LABEL_STYLE)
-        layout.addWidget(title_label)
-        
-        # Select All / Deselect All buttons
-        button_layout = QHBoxLayout()
-        
-        self.select_all_btn = QPushButton(SELECT_ALL_TEXT)
-        self.select_all_btn.clicked.connect(self.select_all_files)
-        button_layout.addWidget(self.select_all_btn)
-        
-        self.deselect_all_btn = QPushButton(DESELECT_ALL_TEXT)
-        self.deselect_all_btn.clicked.connect(self.deselect_all_files)
-        button_layout.addWidget(self.deselect_all_btn)
-        
-        layout.addLayout(button_layout)
-        
-        # File list
-        self.file_list = FileListWidget()
-        self.file_list.checkbox_changed.connect(self.files_changed.emit)
-        layout.addWidget(self.file_list, 1)  # Stretch to fill available space
-        
-        # Add/Remove buttons
-        control_layout = QHBoxLayout()
-        
-        self.add_btn = QPushButton(ADD_BUTTON_EMOJI)
-        self.add_btn.setToolTip(ADD_FILES_TOOLTIP)
-        self.add_btn.clicked.connect(self.add_files)
-        control_layout.addWidget(self.add_btn)
-        
-        self.remove_btn = QPushButton(REMOVE_BUTTON_EMOJI)
-        self.remove_btn.setToolTip(REMOVE_FILES_TOOLTIP)
-        self.remove_btn.clicked.connect(self.remove_selected_files)
-        control_layout.addWidget(self.remove_btn)
-        
-        control_layout.addStretch()  # Push buttons to the left
-        
-        layout.addLayout(control_layout)
-        
-        self.setLayout(layout)
-        
-        # Enable keyboard shortcuts
-        self.file_list.keyPressEvent = self.handle_key_press
-        
-    def handle_key_press(self, event):
-        """Handle keyboard events for the file list."""
-        if event.key() == Qt.Key_Delete:
-            self.remove_selected_files()
-        else:
-            # Call the original keyPressEvent
-            QListWidget.keyPressEvent(self.file_list, event)
-    
-    def add_files(self):
-        """Open tabbed dialog to add log files."""
-        dialog = AddFilesDialog(self)
-        
-        if dialog.exec_() == QDialog.Accepted:
-            file_paths = dialog.selected_files
-            existing_files = self.get_all_files()
-            added_files = []
-            skipped_files = []
-            
-            for file_path in file_paths:
-                # Normalize path for comparison
-                normalized_path = str(Path(file_path).resolve())
-                
-                # Check if file is already in the list
-                already_exists = any(
-                    str(Path(existing_file).resolve()) == normalized_path 
-                    for existing_file in existing_files
-                )
-                
-                if not already_exists:
-                    self.file_list.add_log_file(file_path)
-                    added_files.append(file_path)
-                else:
-                    skipped_files.append(Path(file_path).name)
-            
-            # Show message if some files were skipped
-            if skipped_files:
-                if len(skipped_files) == 1:
-                    message = DUPLICATE_FILE_MESSAGE_SINGLE.format(file=skipped_files[0])
-                else:
-                    message = DUPLICATE_FILES_MESSAGE_MULTIPLE.format(count=len(skipped_files))
-                
-                QMessageBox.information(self, DUPLICATE_FILES_DIALOG_TITLE, message)
-            
-            if added_files:
-                self.files_changed.emit()
-    
-    def remove_selected_files(self):
-        """Remove currently selected files from the list."""
-        selected_items = self.file_list.selectedItems()
-        if not selected_items:
-            return
-        
-        # Confirm removal if multiple files selected
-        if len(selected_items) > 1:
-            reply = QMessageBox.question(
-                self, 
-                REMOVE_FILES_DIALOG_TITLE,
-                REMOVE_MULTIPLE_FILES_CONFIRM.format(count=len(selected_items)),
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            if reply != QMessageBox.Yes:
-                return
-        
-        # Remove items in reverse order to avoid index issues
-        for item in reversed(selected_items):
-            row = self.file_list.row(item)
-            self.file_list.takeItem(row)
-        
-        self.files_changed.emit()
-    
-    def select_all_files(self):
-        """Check all files in the list."""
-        for i in range(self.file_list.count()):
-            item = self.file_list.item(i)
-            widget = self.file_list.itemWidget(item)
-            if isinstance(widget, FileListItemWidget):
-                widget.set_checked(True)
-    
-    def deselect_all_files(self):
-        """Uncheck all files in the list."""
-        for i in range(self.file_list.count()):
-            item = self.file_list.item(i)
-            widget = self.file_list.itemWidget(item)
-            if isinstance(widget, FileListItemWidget):
-                widget.set_checked(False)
-    
-    def get_checked_files(self) -> List[str]:
-        """Return list of file paths that are currently checked."""
-        checked_files = []
-        for i in range(self.file_list.count()):
-            item = self.file_list.item(i)
-            widget = self.file_list.itemWidget(item)
-            if isinstance(widget, FileListItemWidget) and widget.is_checked():
-                checked_files.append(widget.file_path)
-        return checked_files
-    
-    def get_all_files(self) -> List[str]:
-        """Return list of all file paths (checked and unchecked)."""
-        all_files = []
-        for i in range(self.file_list.count()):
-            item = self.file_list.item(i)
-            widget = self.file_list.itemWidget(item)
-            if isinstance(widget, FileListItemWidget):
-                all_files.append(widget.file_path)
-        return all_files
 
 
 class FileDiscoveryResultsDialog(QDialog):
@@ -1552,6 +1771,24 @@ class ColumnConfigurationDialog(QDialog):
         return self.visible_columns.copy()
 
 
+
+    
+    def get_filter_value(self) -> Any:
+        """Get the current filter value."""
+        raise NotImplementedError
+    
+    def reset_filter(self):
+        """Reset filter to default state."""
+        raise NotImplementedError
+    
+    def matches(self, value: Any) -> bool:
+        """Check if a value matches the current filter."""
+        raise NotImplementedError
+
+
+
+
+
 class MergedLogViewer(QMainWindow):
     """Main application window for the merged log viewer."""
     
@@ -1579,24 +1816,49 @@ class MergedLogViewer(QMainWindow):
         # Create toolbar
         self.setup_toolbar()
                 
-        # Create central widget with splitter
+        # Create central widget with horizontal layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)  # No spacing for seamless layout
         
-        # Create splitter for resizable panels
-        splitter = QSplitter(Qt.Horizontal)
+        # Activity Bar (permanent left sidebar)
+        self.activity_bar = ActivityBar()
+        self.activity_bar.files_button_clicked.connect(self.on_files_activity_toggled)
+        layout.addWidget(self.activity_bar)
         
-        # Sidebar
-        self.sidebar = LogViewerSidebar()
-        self.sidebar.files_changed.connect(self.on_files_changed)
-        self.sidebar.setMinimumWidth(SIDEBAR_MIN_WIDTH)
-        self.sidebar.setMaximumWidth(SIDEBAR_MAX_WIDTH)
-        splitter.addWidget(self.sidebar)
+        # Create a horizontal splitter to divide panels and main content
+        self.main_splitter = QSplitter(Qt.Horizontal)
         
-        # Main log view area with table
+        # Panel Container (toggleable panels between activity bar and main content)
+        self.panel_container = PanelContainer()
+        
+        # Create and add panels
+        self.file_picker_panel = FilePickerPanel()
+        self.panel_container.add_panel(self.file_picker_panel)
+        
+        # Connect file picker panel signal
+        self.file_picker_panel.files_changed.connect(self.on_files_changed)
+        
+        self.main_splitter.addWidget(self.panel_container)
+        
+        # Main log view area with filter widget and table
+        main_view_widget = QWidget()
+        self.main_splitter.addWidget(main_view_widget)
+        
+        # Add the splitter to the main layout
+        layout.addWidget(self.main_splitter, 1)
+        
+        # Set up the main view layout
+        main_view_layout = QVBoxLayout(main_view_widget)
+        main_view_layout.setContentsMargins(0, 0, 0, 0)
+        main_view_layout.setSpacing(0)
+        
+
+        
+        # Table view
         self.log_table_view = QTableView()
         self.log_table_model = LogTableModel(self.schema)
         self.log_table_view.setModel(self.log_table_model)
@@ -1613,14 +1875,13 @@ class MergedLogViewer(QMainWindow):
         vertical_scrollbar = self.log_table_view.verticalScrollBar()
         vertical_scrollbar.valueChanged.connect(self.on_scroll_changed)
         vertical_scrollbar.rangeChanged.connect(self.on_scroll_range_changed)
-            
-        splitter.addWidget(self.log_table_view)
         
-        # Set initial splitter sizes (sidebar: 300px, main view: rest)
-        splitter.setSizes(DEFAULT_SPLITTER_SIZES)
+        main_view_layout.addWidget(self.log_table_view)
         
-        layout.addWidget(splitter)
         central_widget.setLayout(layout)
+        
+        # Set initial splitter sizes to hide the panel initially
+        self.main_splitter.setSizes([0, 1])
         
         # Initialize shared buffer and worker
         self.shared_buffer = SharedLogBuffer()
@@ -1633,6 +1894,8 @@ class MergedLogViewer(QMainWindow):
         
         # Start the parsing worker
         self.parsing_worker.start()
+        
+
         
         # Status bar
         self.statusBar().showMessage(READY_STATUS)
@@ -1662,6 +1925,7 @@ class MergedLogViewer(QMainWindow):
     def toggle_follow_mode(self):
         """Toggle follow mode on/off."""
         self.follow_mode = self.follow_action.isChecked()
+
         self.auto_scroll_disabled = False  # Reset manual scroll override
         
         # Immediately scroll to bottom when enabling follow mode
@@ -1675,7 +1939,7 @@ class MergedLogViewer(QMainWindow):
         
         # Check if user manually scrolled away from the bottom
         scrollbar = self.log_table_view.verticalScrollBar()
-        is_at_bottom = (value >= scrollbar.maximum() - SCROLL_TOLERANCE_PIXELS)  # Allow for 1 pixel tolerance
+        is_at_bottom = (value >= scrollbar.maximum() - 1)  # Allow for 1 pixel tolerance
         
         if not is_at_bottom and not self.auto_scroll_disabled:
             # User manually scrolled away from bottom - disable auto-scroll
@@ -1742,6 +2006,8 @@ class MergedLogViewer(QMainWindow):
                 
                 elapsed_time = time.perf_counter() - start_time
                 self.logger.debug(BUFFER_DRAINED_FORMAT.format(count=len(entries), time=elapsed_time))
+                
+
             else:
                 self.logger.debug(BUFFER_EMPTY_MESSAGE)
         else:
@@ -1749,14 +2015,16 @@ class MergedLogViewer(QMainWindow):
 
     def on_files_changed(self):
         """Handle changes to the file list."""
-        checked_files = self.sidebar.get_checked_files()
-        all_files = self.sidebar.get_all_files()
+        checked_files = self.file_picker_panel.get_checked_files()
+        all_files = self.file_picker_panel.get_all_files()
         
         # Update table model to show only checked files
         self.log_table_model.update_checked_files(checked_files)
         
         # Update file colors for the table model
         self._update_file_colors()
+        
+
         
         # Update worker with the complete file list - worker handles all internal management
         if hasattr(self, 'parsing_worker') and self.parsing_worker:
@@ -1771,107 +2039,146 @@ class MergedLogViewer(QMainWindow):
     def _update_file_colors(self):
         """Update the file colors in the table model from the sidebar."""
         file_colors = {}
-        for i in range(self.sidebar.file_list.count()):
-            item = self.sidebar.file_list.item(i)
-            widget = self.sidebar.file_list.itemWidget(item)
+        for i in range(self.file_picker_panel.file_list.count()):
+            item = self.file_picker_panel.file_list.item(i)
+            widget = self.file_picker_panel.file_list.itemWidget(item)
             if isinstance(widget, FileListItemWidget):
                 file_colors[widget.file_path] = widget.get_color()
         
         # Set the colors on the table model using the new caching method
         self.log_table_model.update_file_colors(file_colors)
         
-    def closeEvent(self, event):
-        """Handle application close event - properly stop worker thread."""
-        # Stop the buffer timer
-        if hasattr(self, 'buffer_timer'):
-            self.buffer_timer.stop()
+    def on_files_activity_toggled(self, is_active):
+        """Handle files activity bar button toggle."""
+        if is_active:
+            # Show file picker panel
+            self.panel_container.show_panel('files')
             
-        # Stop and wait for the parsing worker thread
-        if hasattr(self, 'parsing_worker') and self.parsing_worker:
-            self.parsing_worker.stop()
-            # Wait for thread to finish (with timeout)
-            if self.parsing_worker.isRunning():
-                self.parsing_worker.wait(THREAD_SHUTDOWN_TIMEOUT_MS)  # Wait up to 3 seconds
-                if self.parsing_worker.isRunning():
-                    # Force terminate if still running
-                    self.parsing_worker.terminate()
-                    self.parsing_worker.wait(THREAD_FORCE_TERMINATE_TIMEOUT_MS)  # Wait 1 more second
-                    
-        # Accept the close event
-        event.accept()
+            # Adjust splitter to give the panel its proper width
+            current_sizes = self.main_splitter.sizes()
+            self.main_splitter.setSizes([PANEL_MIN_WIDTH, current_sizes[0] + current_sizes[1] - PANEL_MIN_WIDTH])
+            
+            self.logger.debug("Files panel shown")
+        else:
+            # Hide file picker panel
+            self.panel_container.hide_panel()
+            
+            # Collapse the panel area in the splitter
+            current_sizes = self.main_splitter.sizes()
+            self.main_splitter.setSizes([0, current_sizes[0] + current_sizes[1]])
+            
+            self.logger.debug("Files panel hidden")
+        
 
+
+
+    
     def open_column_configuration(self):
         """Open the column configuration dialog."""
         current_config = self.log_table_model.get_column_configuration()
-        
         dialog = ColumnConfigurationDialog(self.schema, current_config, self)
+        
         if dialog.exec_() == QDialog.Accepted:
             new_config = dialog.get_column_configuration()
             self.log_table_model.update_column_configuration(new_config)
             
-            # Update header resize modes for the new column configuration
+            # Update header resize modes for new column configuration
             self.update_header_resize_modes()
-
+            
+            # Update filters to match new columns
+            self.update_filters_with_data()
+    
     def update_header_resize_modes(self):
-        """Update header resize modes based on current column configuration."""
+        """Update table header resize modes to optimize column display."""
         header = self.log_table_view.horizontalHeader()
-        header.setStretchLastSection(True)
         
-        # Set resize mode for all visible columns except the last one
-        visible_column_count = len(self.log_table_model.visible_columns)
-        for i in range(visible_column_count - 1):
-            header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-
-
-def run():
-    """
-    Programmatic entry point for running the LogMerge application.
+        # Set resize mode for each column
+        for i in range(self.log_table_model.columnCount()):
+            column_name = self.log_table_model.visible_columns[i]
+            
+            if column_name == LogTableModel.SOURCE_FILE_COLUMN:
+                # Source file column - resize to contents initially
+                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            else:
+                # Find field definition for other columns
+                field = next((f for f in self.schema.fields if f['name'] == column_name), None)
+                if field:
+                    field_type = field['type']
+                    if field_type in ['epoch', 'strptime']:
+                        # DateTime columns - fixed width
+                        header.setSectionResizeMode(i, QHeaderView.Interactive)
+                        header.resizeSection(i, 150)
+                    elif field_type in ['int', 'float']:
+                        # Numeric columns - resize to contents
+                        header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+                    else:
+                        # String and other columns - stretch to fill space
+                        header.setSectionResizeMode(i, QHeaderView.Stretch)
+                else:
+                    # Default for unknown columns
+                    header.setSectionResizeMode(i, QHeaderView.Interactive)
     
-    This function creates and runs the application without requiring command-line arguments.
-    It can be used when embedding LogMerge in other Python applications.
-    
-    Returns:
-        int: Exit code from the application (0 for success)
+    def closeEvent(self, event):
+        """Handle application close event."""
+        self.logger.info("Application closing...")
         
-    Example:
-        >>> import logmerge
-        >>> exit_code = logmerge.run()
-    """
-    return main()
+        # Stop the parsing worker
+        if hasattr(self, 'parsing_worker') and self.parsing_worker:
+            self.parsing_worker.stop()
+            # Give worker time to clean up
+            if not self.parsing_worker.wait(THREAD_SHUTDOWN_TIMEOUT_MS):
+                self.logger.warning("Worker thread did not shut down gracefully, terminating...")
+                self.parsing_worker.terminate()
+                if not self.parsing_worker.wait(THREAD_FORCE_TERMINATE_TIMEOUT_MS):
+                    self.logger.error("Failed to terminate worker thread")
+        
+        # Stop the buffer timer
+        if hasattr(self, 'buffer_timer'):
+            self.buffer_timer.stop()
+        
+        event.accept()
 
 
 def main():
     """Main entry point for the application."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="Merged Log Viewer - A GUI application for viewing and analyzing multiple log files"
-    )
-    parser.add_argument(
-        '--log-level', 
-        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-        default='WARNING',
-        help='Set the logging level (default: WARNING)'
-    )
-    
+    parser = argparse.ArgumentParser(description="Merged Log Viewer - A GUI for viewing and analyzing log files")
+    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
+    parser.add_argument('--log-file', type=str, help='Log to specified file instead of console')
     args = parser.parse_args()
     
-    # Set up logging
-    logger = setup_logging(args.log_level)
-    logger.info(f"Starting Merged Log Viewer with log level: {args.log_level}")
+    # Setup logging
+    log_level = 'DEBUG' if args.debug else 'INFO'
+    setup_logging(log_level=log_level)
     
+    logger = get_logger(__name__)
+    logger.info("Starting Merged Log Viewer...")
+    
+    # Create QApplication
     app = QApplication(sys.argv)
-    
-    # Set application properties
     app.setApplicationName("Merged Log Viewer")
     app.setApplicationVersion("1.0.0")
     
     # Create and show main window
-    window = MergedLogViewer()
-    window.show()
-    
-    # Start event loop
-    return app.exec_()
+    try:
+        main_window = MergedLogViewer()
+        main_window.show()
+        
+        logger.info("Application started successfully")
+        
+        # Start the event loop
+        sys.exit(app.exec_())
+        
+    except Exception as e:
+        logger.error(f"Failed to start application: {e}")
+        QMessageBox.critical(None, "Application Error", f"Failed to start application:\n{str(e)}")
+        sys.exit(1)
 
 
-if __name__ == '__main__':
-    sys.exit(main())
+def run():
+    """Alternative entry point for backwards compatibility."""
+    main()
+
+
+if __name__ == "__main__":
+    main()
