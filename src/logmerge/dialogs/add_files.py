@@ -298,6 +298,6 @@ class AddFilesDialog(QDialog):
             if results_dialog.exec_() == QDialog.Accepted:
                 self.selected_files = matching_files
             else:
-                return  # User cancelled
+                return
                 
         self.accept()

@@ -15,7 +15,7 @@ Key Features:
 Example:
     Basic usage:
     >>> import logmerge
-    >>> logmerge.run()
+    >>> logmerge.main()
     
     Or from command line:
     $ logmerge
@@ -32,7 +32,7 @@ from .parsing_utils import parse_line_with_regex, convert_field_value
 from .file_monitoring import LogParsingWorker, FileParsingStats, FileMonitorState
 
 # Main application entry point
-from .main import main, run
+from .main import main
 
 __all__ = [
     # Version and metadata
@@ -58,5 +58,4 @@ __all__ = [
     
     # Main application
     "main",
-    "run",
 ]

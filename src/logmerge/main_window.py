@@ -4,15 +4,14 @@ Main Window
 Contains the main application window class.
 """
 
-import sys
 import time
-from typing import Optional
+from typing import Optional, List
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QTableView, 
     QHeaderView, QAction, QApplication, QDialog, QMessageBox
 )
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QEvent
 
 from .logging_config import get_logger
 from .plugin_utils import LogParsingPlugin
@@ -47,7 +46,7 @@ class MergedLogViewer(QMainWindow):
         
         # First, select schema before setting up UI
         if not self.select_schema():
-            sys.exit()  # User cancelled schema selection
+            raise RuntimeError("Schema selection cancelled by user")
             
         self.setup_ui()
         
@@ -58,20 +57,39 @@ class MergedLogViewer(QMainWindow):
         
         # Create toolbar
         self.setup_toolbar()
-                
+        
+        # Set up main layout
+        self._setup_main_layout()
+        
+        # Initialize worker and timer
+        self._initialize_background_processing()
+        
+        # Status bar
+        self.statusBar().showMessage(READY_STATUS)
+    
+    def _setup_main_layout(self):
+        """Set up the main window layout with panels and table view."""
         # Create central widget with horizontal layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)  # No spacing for seamless layout
+        layout.setSpacing(0)
         
         # Activity Bar (permanent left sidebar)
         self.activity_bar = ActivityBar()
         self.activity_bar.files_button_clicked.connect(self.on_files_activity_toggled)
         layout.addWidget(self.activity_bar)
         
+        # Create main splitter and panels
+        self._setup_panels_and_splitter()
+        layout.addWidget(self.main_splitter, 1)
+        
+        central_widget.setLayout(layout)
+    
+    def _setup_panels_and_splitter(self):
+        """Set up the splitter with panels and main table view."""
         # Create a horizontal splitter to divide panels and main content
         self.main_splitter = QSplitter(Qt.Horizontal)
         
@@ -87,12 +105,16 @@ class MergedLogViewer(QMainWindow):
         
         self.main_splitter.addWidget(self.panel_container)
         
-        # Main log view area with filter widget and table
+        # Create main table view area
+        self._setup_table_view()
+        
+        # Set initial splitter sizes to hide the panel initially
+        self.main_splitter.setSizes([0, 1])
+    
+    def _setup_table_view(self):
+        """Set up the main log table view."""
         main_view_widget = QWidget()
         self.main_splitter.addWidget(main_view_widget)
-        
-        # Add the splitter to the main layout
-        layout.addWidget(self.main_splitter, 1)
         
         # Set up the main view layout
         main_view_layout = QVBoxLayout(main_view_widget)
@@ -118,12 +140,9 @@ class MergedLogViewer(QMainWindow):
         vertical_scrollbar.rangeChanged.connect(self.on_scroll_range_changed)
         
         main_view_layout.addWidget(self.log_table_view)
-        
-        central_widget.setLayout(layout)
-        
-        # Set initial splitter sizes to hide the panel initially
-        self.main_splitter.setSizes([0, 1])
-        
+    
+    def _initialize_background_processing(self):
+        """Initialize the background worker thread and buffer timer."""
         # Initialize shared buffer and worker
         self.shared_buffer = SharedLogBuffer()
         self.parsing_worker = LogParsingWorker(self.schema, self.shared_buffer, self)
@@ -131,13 +150,10 @@ class MergedLogViewer(QMainWindow):
         # Timer to drain shared buffer
         self.buffer_timer = QTimer()
         self.buffer_timer.timeout.connect(self.drain_log_buffer)
-        self.buffer_timer.start(BUFFER_DRAIN_INTERVAL_MS)  # Drain every 100ms
+        self.buffer_timer.start(BUFFER_DRAIN_INTERVAL_MS)
         
         # Start the parsing worker
         self.parsing_worker.start()
-        
-        # Status bar
-        self.statusBar().showMessage(READY_STATUS)
     
     def setup_toolbar(self):
         """Set up the main toolbar with follow mode controls."""
@@ -152,7 +168,6 @@ class MergedLogViewer(QMainWindow):
         self.follow_action.triggered.connect(self.toggle_follow_mode)
         toolbar.addAction(self.follow_action)
         
-        # Add separator
         toolbar.addSeparator()
         
         # Column configuration action
@@ -166,30 +181,27 @@ class MergedLogViewer(QMainWindow):
         self.follow_mode = self.follow_action.isChecked()
         self.auto_scroll_disabled = False  # Reset manual scroll override
         
-        # Immediately scroll to bottom when enabling follow mode
         if self.follow_mode:
             self.scroll_to_bottom()
     
-    def on_scroll_changed(self, value):
+    def on_scroll_changed(self, value: int) -> None:
         """Handle manual scrolling by the user."""
         if not self.follow_mode:
             return
         
         # Check if user manually scrolled away from the bottom
         scrollbar = self.log_table_view.verticalScrollBar()
-        is_at_bottom = (value >= scrollbar.maximum() - 1)  # Allow for 1 pixel tolerance
+        is_at_bottom = (value >= scrollbar.maximum() - 1)
         
         if not is_at_bottom and not self.auto_scroll_disabled:
-            # User manually scrolled away from bottom - disable auto-scroll
             self.auto_scroll_disabled = True
     
-    def on_scroll_range_changed(self, min_val, max_val):
+    def on_scroll_range_changed(self, min_val: int, max_val: int) -> None:
         """Handle when the scroll range changes (new content added)."""
         if self.follow_mode and not self.auto_scroll_disabled:
-            # Auto-scroll to bottom when new content is added
             QTimer.singleShot(0, self.scroll_to_bottom)
     
-    def scroll_to_bottom(self):
+    def scroll_to_bottom(self) -> None:
         """Scroll the table view to the bottom."""
         scrollbar = self.log_table_view.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
@@ -215,39 +227,39 @@ class MergedLogViewer(QMainWindow):
             return False
     
     def drain_log_buffer(self):
-        start_time = time.perf_counter()
         """Drain entries from shared buffer and update table."""
-        if self.shared_buffer:
-            entries = self.shared_buffer.drain_entries()
-            if entries:
-                self.logger.debug(PROCESSING_ENTRIES_FORMAT.format(count=len(entries)))
-                
-                # Remember current scroll position for follow mode logic
-                scrollbar = self.log_table_view.verticalScrollBar()
-                was_at_bottom = (scrollbar.value() >= scrollbar.maximum() - 1)
-                
-                # Batch add to table model
-                self.log_table_model.add_entries_batch(entries)
-                
-                # Force Qt to process all pending events (including table redraws)
-                QApplication.processEvents()
-                
-                # Handle follow mode scrolling
-                if self.follow_mode and not self.auto_scroll_disabled:
-                    # If we were at the bottom before adding entries, stay at bottom
-                    if was_at_bottom or scrollbar.maximum() == 0:
-                        self.scroll_to_bottom()
-                elif self.follow_mode and self.auto_scroll_disabled and was_at_bottom:
-                    # User was manually at bottom - re-enable auto-scroll
-                    self.auto_scroll_disabled = False
-                    self.scroll_to_bottom()
-                
-                elapsed_time = time.perf_counter() - start_time
-                self.logger.debug(BUFFER_DRAINED_FORMAT.format(count=len(entries), time=elapsed_time))
-            else:
-                self.logger.debug(BUFFER_EMPTY_MESSAGE)
-        else:
+        if not self.shared_buffer:
             self.logger.warning(NO_SHARED_BUFFER_MESSAGE)
+            return
+            
+        start_time = time.perf_counter()
+        entries = self.shared_buffer.drain_entries()
+        
+        if not entries:
+            self.logger.debug(BUFFER_EMPTY_MESSAGE)
+            return
+            
+        self.logger.debug(PROCESSING_ENTRIES_FORMAT.format(count=len(entries)))
+        
+        # Remember current scroll position for follow mode logic
+        scrollbar = self.log_table_view.verticalScrollBar()
+        was_at_bottom = (scrollbar.value() >= scrollbar.maximum() - 1)
+        
+        # Batch add to table model
+        self.log_table_model.add_entries_batch(entries)
+        
+        QApplication.processEvents()
+        
+        # Handle follow mode scrolling
+        if self.follow_mode and not self.auto_scroll_disabled:
+            if was_at_bottom or scrollbar.maximum() == 0:
+                self.scroll_to_bottom()
+        elif self.follow_mode and self.auto_scroll_disabled and was_at_bottom:
+            self.auto_scroll_disabled = False
+            self.scroll_to_bottom()
+        
+        elapsed_time = time.perf_counter() - start_time
+        self.logger.debug(BUFFER_DRAINED_FORMAT.format(count=len(entries), time=elapsed_time))
 
     def on_files_changed(self):
         """Handle changes to the file list."""
@@ -260,8 +272,7 @@ class MergedLogViewer(QMainWindow):
         # Update file colors for the table model
         self._update_file_colors()
         
-        # Update worker with the complete file list - worker handles all internal management
-        if hasattr(self, 'parsing_worker') and self.parsing_worker:
+        if self.parsing_worker:
             self.parsing_worker.update_file_list(all_files)
         
         # Update status message with file counts
@@ -272,38 +283,37 @@ class MergedLogViewer(QMainWindow):
         
     def _update_file_colors(self):
         """Update the file colors in the table model from the sidebar."""
+        file_list = self.file_picker_panel.file_list
         file_colors = {}
-        for i in range(self.file_picker_panel.file_list.count()):
-            item = self.file_picker_panel.file_list.item(i)
-            widget = self.file_picker_panel.file_list.itemWidget(item)
-            if isinstance(widget, FileListItemWidget):
-                file_colors[widget.file_path] = widget.get_color()
         
-        # Set the colors on the table model using the new caching method
-        self.log_table_model.update_file_colors(file_colors)
+        for i in range(file_list.count()):
+            item = file_list.item(i)
+            if item:
+                widget = file_list.itemWidget(item)
+                if isinstance(widget, FileListItemWidget):
+                    file_colors[widget.file_path] = widget.get_color()
         
-    def on_files_activity_toggled(self, is_active):
+        if file_colors:
+            self.log_table_model.update_file_colors(file_colors)
+        
+    def on_files_activity_toggled(self, is_active: bool) -> None:
         """Handle files activity bar button toggle."""
         if is_active:
-            # Show file picker panel
             self.panel_container.show_panel('files')
             
-            # Adjust splitter to give the panel its proper width
             current_sizes = self.main_splitter.sizes()
             self.main_splitter.setSizes([PANEL_MIN_WIDTH, current_sizes[0] + current_sizes[1] - PANEL_MIN_WIDTH])
             
             self.logger.debug("Files panel shown")
         else:
-            # Hide file picker panel
             self.panel_container.hide_panel()
             
-            # Collapse the panel area in the splitter
             current_sizes = self.main_splitter.sizes()
             self.main_splitter.setSizes([0, current_sizes[0] + current_sizes[1]])
             
             self.logger.debug("Files panel hidden")
     
-    def open_column_configuration(self):
+    def open_column_configuration(self) -> None:
         """Open the column configuration dialog."""
         current_config = self.log_table_model.get_column_configuration()
         dialog = ColumnConfigurationDialog(self.schema, current_config, self)
@@ -312,55 +322,44 @@ class MergedLogViewer(QMainWindow):
             new_config = dialog.get_column_configuration()
             self.log_table_model.update_column_configuration(new_config)
             
-            # Update header resize modes for new column configuration
             self.update_header_resize_modes()
     
-    def update_header_resize_modes(self):
+    def update_header_resize_modes(self) -> None:
         """Update table header resize modes to optimize column display."""
         header = self.log_table_view.horizontalHeader()
         
-        # Set resize mode for each column
         for i in range(self.log_table_model.columnCount()):
             column_name = self.log_table_model.visible_columns[i]
             
             if column_name == LogTableModel.SOURCE_FILE_COLUMN:
-                # Source file column - resize to contents initially
                 header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
             else:
-                # Find field definition for other columns
                 field = next((f for f in self.schema.fields if f['name'] == column_name), None)
                 if field:
                     field_type = field['type']
                     if field_type in ['epoch', 'strptime']:
-                        # DateTime columns - fixed width
                         header.setSectionResizeMode(i, QHeaderView.Interactive)
                         header.resizeSection(i, 150)
                     elif field_type in ['int', 'float']:
-                        # Numeric columns - resize to contents
                         header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
                     else:
-                        # String and other columns - stretch to fill space
                         header.setSectionResizeMode(i, QHeaderView.Stretch)
                 else:
-                    # Default for unknown columns
                     header.setSectionResizeMode(i, QHeaderView.Interactive)
     
-    def closeEvent(self, event):
+    def closeEvent(self, event: QEvent) -> None:
         """Handle application close event."""
         self.logger.info("Application closing...")
         
-        # Stop the parsing worker
-        if hasattr(self, 'parsing_worker') and self.parsing_worker:
+        if self.parsing_worker:
             self.parsing_worker.stop()
-            # Give worker time to clean up
             if not self.parsing_worker.wait(THREAD_SHUTDOWN_TIMEOUT_MS):
                 self.logger.warning("Worker thread did not shut down gracefully, terminating...")
                 self.parsing_worker.terminate()
                 if not self.parsing_worker.wait(THREAD_FORCE_TERMINATE_TIMEOUT_MS):
                     self.logger.error("Failed to terminate worker thread")
         
-        # Stop the buffer timer
-        if hasattr(self, 'buffer_timer'):
+        if self.buffer_timer:
             self.buffer_timer.stop()
         
         event.accept()

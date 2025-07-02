@@ -51,10 +51,5 @@ def main():
         sys.exit(1)
 
 
-def run():
-    """Alternative entry point for backwards compatibility."""
-    main()
-
-
 if __name__ == "__main__":
     main()

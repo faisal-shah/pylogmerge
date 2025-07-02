@@ -79,7 +79,7 @@ class FilePickerPanel(BasePanel):
         # File list
         self.file_list = FileListWidget()
         self.file_list.checkbox_changed.connect(self.files_changed.emit)
-        layout.addWidget(self.file_list, 1)  # Stretch to fill available space
+        layout.addWidget(self.file_list, 1)
         
         # Add/Remove buttons
         control_layout = QHBoxLayout()

@@ -52,6 +52,105 @@ The application will start, and you will first be prompted to select a log parsi
 
 -   `--log-level <LEVEL>`: Set the logging level. Choices are DEBUG, INFO, WARNING, ERROR, CRITICAL. Default is WARNING.
 
+## Architecture Overview
+
+LogMerge follows a multi-threaded, event-driven architecture designed for real-time log monitoring and efficient display updates. Understanding this architecture is crucial for contributors and advanced users.
+
+### High-Level Data Flow
+
+```
+Log Files → File Monitor Thread → Shared Buffer → UI Thread → Table Display
+    ↓              ↓                    ↓           ↓           ↓
+Polling         Parsing            Batching    Draining    Rendering
+(1Hz)          (Plugin)           (100 items)   (2Hz)      (On-demand)
+```
+
+### Core Components
+
+#### 1. **File Monitoring System** (`file_monitoring.py`)
+- **Thread**: Runs in a separate `LogParsingWorker` thread
+- **Polling Frequency**: 1 second (configurable via `DEFAULT_POLL_INTERVAL_SECONDS`)
+- **Operation**: 
+  - Monitors file size and modification time for each added log file
+  - Maintains file handles and tracks last read position (`FileMonitorState`)
+  - Reads only new lines since last poll using `file.readlines()`
+  - Processes new lines through the selected plugin
+
+#### 2. **Plugin-Based Parsing** (`plugin_utils.py`)
+- **Input**: Raw log line (string)
+- **Processing**: Each line is passed to the plugin's parsing function
+- **Output**: Returns a `LogEntry` named tuple containing:
+  - `file_path`: Source file
+  - `line_number`: Line number in file
+  - `timestamp`: Parsed datetime for chronological ordering
+  - `fields`: Dictionary of parsed field values
+  - `raw_line`: Original line text
+- **Error Handling**: Unparseable lines are dropped and logged
+
+#### 3. **Shared Buffer System** (`data_structures.py`)
+- **Type**: Thread-safe `deque` with maximum size (10M entries default)
+- **Purpose**: Decouples file monitoring thread from UI thread
+- **Batching**: Worker thread adds entries when batch reaches 100 items OR at end of each polling cycle
+- **Location**: See `file_monitoring.py:118-127` - uses `DEFAULT_BATCH_SIZE = 100`
+- **Thread Safety**: All operations protected by threading locks
+
+#### 4. **UI Update Cycle** (`main_window.py`)
+- **Timer**: QTimer triggers buffer drain every 500ms (`BUFFER_DRAIN_INTERVAL_MS` - half the file polling interval)
+- **Process**:
+  1. Drain all entries from shared buffer
+  2. Add entries to table model using binary search insertion
+  3. Force Qt event processing with `QApplication.processEvents()`
+  4. Handle auto-scroll in follow mode
+- **Performance**: Only processes Qt events when entries are available
+
+#### 5. **Display Management** (`widgets/log_table.py`)
+- **Model**: Custom `QAbstractTableModel` with smart caching
+- **Filtering**: Shows only entries from checked files
+- **Sorting**: Entries maintained in chronological order via binary search
+- **Caching**: Cached datetime formatting and file colors for performance
+- **Memory**: Efficient filtering without data duplication
+
+### Timing and Performance Characteristics
+
+| Component | Frequency | Purpose |
+|-----------|-----------|---------|
+| File Polling | 1 Hz | Check for file changes (balance between responsiveness and system load) |
+| Buffer Draining | 2 Hz | Update UI with new log entries (half the file polling rate for balanced responsiveness) |
+| Batch Size | UP TO 100 entries | Optimize memory allocation and UI update efficiency (flushes at 100 OR end of polling cycle) |
+| Buffer Size | 10M entries | Prevent memory exhaustion during high-volume logging |
+
+### Thread Architecture
+
+```
+Main Thread (UI)                    Worker Thread (File Monitor)
+     │                                        │
+     ├─ QTimer (500ms)                       ├─ Polling Loop (1000ms)
+     ├─ Buffer Drain                         ├─ File Change Detection
+     ├─ Table Updates                        ├─ Line-by-Line Reading
+     ├─ User Interactions                    ├─ Plugin Parsing
+     └─ UI Rendering                         └─ Buffer Population
+             │                                        │
+             └────── SharedLogBuffer ←────────────────┘
+                    (Thread-Safe Queue)
+```
+
+### Plugin System Details
+
+Plugins must define a `SCHEMA` dictionary containing:
+- **Field definitions**: Name, type, and parsing rules for each log field
+- **Regex pattern**: For line parsing (optional if custom parser provided)
+- **Timestamp field**: Which field contains the chronological timestamp
+
+Optional `parse_raw_line()` function enables custom parsing logic beyond regex.
+
+### Key Design Decisions
+
+1. **Polling vs. File Watching**: Uses polling for cross-platform compatibility and simplicity
+2. **Binary Search Insertion**: Maintains chronological order efficiently (O(log n))
+3. **Shared Buffer**: Prevents UI blocking during high-volume log processing
+4. **Caching Strategy**: Multiple cache layers (datetime strings, colors, filtered entries)
+5. **Follow Mode**: Smart auto-scroll that respects user manual scrolling
+
 ## Plugins
 
 LogMerge uses a plugin system to support various log formats. Built-in plugins include:

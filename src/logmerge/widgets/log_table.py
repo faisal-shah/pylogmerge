@@ -34,6 +34,7 @@ class LogTableModel(QAbstractTableModel):
         self.visible_entries = []  # Cached filtered entries for performance
         self.cached_file_colors = {}  # Cache for lightened background colors
         self.cached_datetime_strings = {}  # Cache for formatted datetime strings
+        self.file_colors = {}  # File path to color mapping
         # Column configuration - include virtual Source File column first, then schema columns
         self.visible_columns = [self.SOURCE_FILE_COLUMN] + [field['name'] for field in schema.fields]
     
@@ -227,7 +228,7 @@ class LogTableModel(QAbstractTableModel):
             return self.cached_file_colors[file_path]
             
         # Calculate and cache the lightened color
-        if hasattr(self, 'file_colors') and file_path in self.file_colors:
+        if file_path in self.file_colors:
             color = self.file_colors[file_path]
             # Return a very light version of the color for background
             # Convert float calculations to integers

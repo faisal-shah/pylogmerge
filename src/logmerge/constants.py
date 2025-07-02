@@ -11,7 +11,7 @@ from PyQt5.QtGui import QColor
 # THREADING & PERFORMANCE CONSTANTS
 # ============================================================================
 
-BUFFER_DRAIN_INTERVAL_MS = 100  # Timer interval for draining buffer
+BUFFER_DRAIN_INTERVAL_MS = 500  # Timer interval for draining buffer (half the file polling interval)
 SCROLL_TOLERANCE_PIXELS = 1     # Tolerance for "at bottom" detection
 THREAD_SHUTDOWN_TIMEOUT_MS = 3000
 THREAD_FORCE_TERMINATE_TIMEOUT_MS = 1000

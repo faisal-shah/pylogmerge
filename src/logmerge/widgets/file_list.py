@@ -79,7 +79,7 @@ class FileListItemWidget(QWidget):
         file_name = Path(self.file_path).name
         self.file_label = QLabel(file_name)
         self.file_label.setToolTip(self.file_path)  # Show full path on hover
-        layout.addWidget(self.file_label, 1)  # Stretch to fill available space
+        layout.addWidget(self.file_label, 1)
         
         self.setLayout(layout)
     
