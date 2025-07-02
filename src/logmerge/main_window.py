@@ -1,0 +1,366 @@
+"""
+Main Window
+
+Contains the main application window class.
+"""
+
+import sys
+import time
+from typing import Optional
+
+from PyQt5.QtWidgets import (
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QTableView, 
+    QHeaderView, QAction, QApplication, QDialog, QMessageBox
+)
+from PyQt5.QtCore import Qt, QTimer
+
+from .logging_config import get_logger
+from .plugin_utils import LogParsingPlugin
+from .data_structures import SharedLogBuffer
+from .file_monitoring import LogParsingWorker
+from .widgets import (
+    ActivityBar, PanelContainer, FilePickerPanel, LogTableModel, FileListItemWidget
+)
+from .dialogs import SchemaSelectionDialog, ColumnConfigurationDialog
+from .constants import (
+    WINDOW_TITLE, MAIN_WINDOW_DEFAULT_GEOMETRY, FOLLOW_ACTION_TEXT, FOLLOW_MODE_TOOLTIP,
+    COLUMN_CONFIG_ACTION_TEXT, COLUMN_CONFIG_TOOLTIP, BUFFER_DRAIN_INTERVAL_MS,
+    READY_STATUS, PANEL_MIN_WIDTH, SCHEMA_ERROR_DIALOG_TITLE, SCHEMA_LOAD_ERROR_FORMAT,
+    PROCESSING_ENTRIES_FORMAT, BUFFER_DRAINED_FORMAT, BUFFER_EMPTY_MESSAGE,
+    NO_SHARED_BUFFER_MESSAGE, FILE_COUNT_STATUS_FORMAT, THREAD_SHUTDOWN_TIMEOUT_MS,
+    THREAD_FORCE_TERMINATE_TIMEOUT_MS
+)
+
+
+class MergedLogViewer(QMainWindow):
+    """Main application window for the merged log viewer."""
+    
+    def __init__(self):
+        super().__init__()
+        self.logger = get_logger(__name__)
+        self.schema = None
+        self.log_table_model = None
+        self.parsing_worker = None
+        self.shared_buffer = None
+        self.follow_mode = True  # Auto-scroll to bottom by default
+        self.auto_scroll_disabled = False  # Track if user manually scrolled away
+        
+        # First, select schema before setting up UI
+        if not self.select_schema():
+            sys.exit()  # User cancelled schema selection
+            
+        self.setup_ui()
+        
+    def setup_ui(self):
+        """Set up the main window UI."""
+        self.setWindowTitle(WINDOW_TITLE)
+        self.setGeometry(*MAIN_WINDOW_DEFAULT_GEOMETRY)
+        
+        # Create toolbar
+        self.setup_toolbar()
+                
+        # Create central widget with horizontal layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)  # No spacing for seamless layout
+        
+        # Activity Bar (permanent left sidebar)
+        self.activity_bar = ActivityBar()
+        self.activity_bar.files_button_clicked.connect(self.on_files_activity_toggled)
+        layout.addWidget(self.activity_bar)
+        
+        # Create a horizontal splitter to divide panels and main content
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        
+        # Panel Container (toggleable panels between activity bar and main content)
+        self.panel_container = PanelContainer()
+        
+        # Create and add panels
+        self.file_picker_panel = FilePickerPanel()
+        self.panel_container.add_panel(self.file_picker_panel)
+        
+        # Connect file picker panel signal
+        self.file_picker_panel.files_changed.connect(self.on_files_changed)
+        
+        self.main_splitter.addWidget(self.panel_container)
+        
+        # Main log view area with filter widget and table
+        main_view_widget = QWidget()
+        self.main_splitter.addWidget(main_view_widget)
+        
+        # Add the splitter to the main layout
+        layout.addWidget(self.main_splitter, 1)
+        
+        # Set up the main view layout
+        main_view_layout = QVBoxLayout(main_view_widget)
+        main_view_layout.setContentsMargins(0, 0, 0, 0)
+        main_view_layout.setSpacing(0)
+        
+        # Table view
+        self.log_table_view = QTableView()
+        self.log_table_model = LogTableModel(self.schema)
+        self.log_table_view.setModel(self.log_table_model)
+        
+        # Configure table view
+        self.log_table_view.setAlternatingRowColors(True)
+        self.log_table_view.setSelectionBehavior(QTableView.SelectRows)
+        self.log_table_view.setSortingEnabled(True)
+        
+        # Setup initial header resize modes
+        self.update_header_resize_modes()
+        
+        # Connect scroll bar signals for follow mode
+        vertical_scrollbar = self.log_table_view.verticalScrollBar()
+        vertical_scrollbar.valueChanged.connect(self.on_scroll_changed)
+        vertical_scrollbar.rangeChanged.connect(self.on_scroll_range_changed)
+        
+        main_view_layout.addWidget(self.log_table_view)
+        
+        central_widget.setLayout(layout)
+        
+        # Set initial splitter sizes to hide the panel initially
+        self.main_splitter.setSizes([0, 1])
+        
+        # Initialize shared buffer and worker
+        self.shared_buffer = SharedLogBuffer()
+        self.parsing_worker = LogParsingWorker(self.schema, self.shared_buffer, self)
+        
+        # Timer to drain shared buffer
+        self.buffer_timer = QTimer()
+        self.buffer_timer.timeout.connect(self.drain_log_buffer)
+        self.buffer_timer.start(BUFFER_DRAIN_INTERVAL_MS)  # Drain every 100ms
+        
+        # Start the parsing worker
+        self.parsing_worker.start()
+        
+        # Status bar
+        self.statusBar().showMessage(READY_STATUS)
+    
+    def setup_toolbar(self):
+        """Set up the main toolbar with follow mode controls."""
+        toolbar = self.addToolBar("Main")
+        toolbar.setMovable(False)
+        
+        # Follow mode toggle action
+        self.follow_action = QAction(FOLLOW_ACTION_TEXT, self)
+        self.follow_action.setCheckable(True)
+        self.follow_action.setChecked(self.follow_mode)
+        self.follow_action.setToolTip(FOLLOW_MODE_TOOLTIP)
+        self.follow_action.triggered.connect(self.toggle_follow_mode)
+        toolbar.addAction(self.follow_action)
+        
+        # Add separator
+        toolbar.addSeparator()
+        
+        # Column configuration action
+        self.column_config_action = QAction(COLUMN_CONFIG_ACTION_TEXT, self)
+        self.column_config_action.setToolTip(COLUMN_CONFIG_TOOLTIP)
+        self.column_config_action.triggered.connect(self.open_column_configuration)
+        toolbar.addAction(self.column_config_action)
+    
+    def toggle_follow_mode(self):
+        """Toggle follow mode on/off."""
+        self.follow_mode = self.follow_action.isChecked()
+        self.auto_scroll_disabled = False  # Reset manual scroll override
+        
+        # Immediately scroll to bottom when enabling follow mode
+        if self.follow_mode:
+            self.scroll_to_bottom()
+    
+    def on_scroll_changed(self, value):
+        """Handle manual scrolling by the user."""
+        if not self.follow_mode:
+            return
+        
+        # Check if user manually scrolled away from the bottom
+        scrollbar = self.log_table_view.verticalScrollBar()
+        is_at_bottom = (value >= scrollbar.maximum() - 1)  # Allow for 1 pixel tolerance
+        
+        if not is_at_bottom and not self.auto_scroll_disabled:
+            # User manually scrolled away from bottom - disable auto-scroll
+            self.auto_scroll_disabled = True
+    
+    def on_scroll_range_changed(self, min_val, max_val):
+        """Handle when the scroll range changes (new content added)."""
+        if self.follow_mode and not self.auto_scroll_disabled:
+            # Auto-scroll to bottom when new content is added
+            QTimer.singleShot(0, self.scroll_to_bottom)
+    
+    def scroll_to_bottom(self):
+        """Scroll the table view to the bottom."""
+        scrollbar = self.log_table_view.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+    
+    def select_schema(self) -> bool:
+        """Show schema selection dialog and load the selected schema."""
+        # Select schema file
+        schema_dialog = SchemaSelectionDialog(self)
+        if schema_dialog.exec_() != QDialog.Accepted or not schema_dialog.selected_schema_path:
+            return False
+            
+        try:
+            # Load and create plugin from file
+            self.schema = LogParsingPlugin.from_file(schema_dialog.selected_schema_path)
+            return True
+            
+        except Exception as e:
+            QMessageBox.critical(
+                self, 
+                SCHEMA_ERROR_DIALOG_TITLE, 
+                SCHEMA_LOAD_ERROR_FORMAT.format(error=str(e))
+            )
+            return False
+    
+    def drain_log_buffer(self):
+        start_time = time.perf_counter()
+        """Drain entries from shared buffer and update table."""
+        if self.shared_buffer:
+            entries = self.shared_buffer.drain_entries()
+            if entries:
+                self.logger.debug(PROCESSING_ENTRIES_FORMAT.format(count=len(entries)))
+                
+                # Remember current scroll position for follow mode logic
+                scrollbar = self.log_table_view.verticalScrollBar()
+                was_at_bottom = (scrollbar.value() >= scrollbar.maximum() - 1)
+                
+                # Batch add to table model
+                self.log_table_model.add_entries_batch(entries)
+                
+                # Force Qt to process all pending events (including table redraws)
+                QApplication.processEvents()
+                
+                # Handle follow mode scrolling
+                if self.follow_mode and not self.auto_scroll_disabled:
+                    # If we were at the bottom before adding entries, stay at bottom
+                    if was_at_bottom or scrollbar.maximum() == 0:
+                        self.scroll_to_bottom()
+                elif self.follow_mode and self.auto_scroll_disabled and was_at_bottom:
+                    # User was manually at bottom - re-enable auto-scroll
+                    self.auto_scroll_disabled = False
+                    self.scroll_to_bottom()
+                
+                elapsed_time = time.perf_counter() - start_time
+                self.logger.debug(BUFFER_DRAINED_FORMAT.format(count=len(entries), time=elapsed_time))
+            else:
+                self.logger.debug(BUFFER_EMPTY_MESSAGE)
+        else:
+            self.logger.warning(NO_SHARED_BUFFER_MESSAGE)
+
+    def on_files_changed(self):
+        """Handle changes to the file list."""
+        checked_files = self.file_picker_panel.get_checked_files()
+        all_files = self.file_picker_panel.get_all_files()
+        
+        # Update table model to show only checked files
+        self.log_table_model.update_checked_files(checked_files)
+        
+        # Update file colors for the table model
+        self._update_file_colors()
+        
+        # Update worker with the complete file list - worker handles all internal management
+        if hasattr(self, 'parsing_worker') and self.parsing_worker:
+            self.parsing_worker.update_file_list(all_files)
+        
+        # Update status message with file counts
+        status_msg = FILE_COUNT_STATUS_FORMAT.format(total=len(all_files), selected=len(checked_files))
+        if not all_files:
+            status_msg = READY_STATUS
+        self.statusBar().showMessage(status_msg)
+        
+    def _update_file_colors(self):
+        """Update the file colors in the table model from the sidebar."""
+        file_colors = {}
+        for i in range(self.file_picker_panel.file_list.count()):
+            item = self.file_picker_panel.file_list.item(i)
+            widget = self.file_picker_panel.file_list.itemWidget(item)
+            if isinstance(widget, FileListItemWidget):
+                file_colors[widget.file_path] = widget.get_color()
+        
+        # Set the colors on the table model using the new caching method
+        self.log_table_model.update_file_colors(file_colors)
+        
+    def on_files_activity_toggled(self, is_active):
+        """Handle files activity bar button toggle."""
+        if is_active:
+            # Show file picker panel
+            self.panel_container.show_panel('files')
+            
+            # Adjust splitter to give the panel its proper width
+            current_sizes = self.main_splitter.sizes()
+            self.main_splitter.setSizes([PANEL_MIN_WIDTH, current_sizes[0] + current_sizes[1] - PANEL_MIN_WIDTH])
+            
+            self.logger.debug("Files panel shown")
+        else:
+            # Hide file picker panel
+            self.panel_container.hide_panel()
+            
+            # Collapse the panel area in the splitter
+            current_sizes = self.main_splitter.sizes()
+            self.main_splitter.setSizes([0, current_sizes[0] + current_sizes[1]])
+            
+            self.logger.debug("Files panel hidden")
+    
+    def open_column_configuration(self):
+        """Open the column configuration dialog."""
+        current_config = self.log_table_model.get_column_configuration()
+        dialog = ColumnConfigurationDialog(self.schema, current_config, self)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            new_config = dialog.get_column_configuration()
+            self.log_table_model.update_column_configuration(new_config)
+            
+            # Update header resize modes for new column configuration
+            self.update_header_resize_modes()
+    
+    def update_header_resize_modes(self):
+        """Update table header resize modes to optimize column display."""
+        header = self.log_table_view.horizontalHeader()
+        
+        # Set resize mode for each column
+        for i in range(self.log_table_model.columnCount()):
+            column_name = self.log_table_model.visible_columns[i]
+            
+            if column_name == LogTableModel.SOURCE_FILE_COLUMN:
+                # Source file column - resize to contents initially
+                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+            else:
+                # Find field definition for other columns
+                field = next((f for f in self.schema.fields if f['name'] == column_name), None)
+                if field:
+                    field_type = field['type']
+                    if field_type in ['epoch', 'strptime']:
+                        # DateTime columns - fixed width
+                        header.setSectionResizeMode(i, QHeaderView.Interactive)
+                        header.resizeSection(i, 150)
+                    elif field_type in ['int', 'float']:
+                        # Numeric columns - resize to contents
+                        header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
+                    else:
+                        # String and other columns - stretch to fill space
+                        header.setSectionResizeMode(i, QHeaderView.Stretch)
+                else:
+                    # Default for unknown columns
+                    header.setSectionResizeMode(i, QHeaderView.Interactive)
+    
+    def closeEvent(self, event):
+        """Handle application close event."""
+        self.logger.info("Application closing...")
+        
+        # Stop the parsing worker
+        if hasattr(self, 'parsing_worker') and self.parsing_worker:
+            self.parsing_worker.stop()
+            # Give worker time to clean up
+            if not self.parsing_worker.wait(THREAD_SHUTDOWN_TIMEOUT_MS):
+                self.logger.warning("Worker thread did not shut down gracefully, terminating...")
+                self.parsing_worker.terminate()
+                if not self.parsing_worker.wait(THREAD_FORCE_TERMINATE_TIMEOUT_MS):
+                    self.logger.error("Failed to terminate worker thread")
+        
+        # Stop the buffer timer
+        if hasattr(self, 'buffer_timer'):
+            self.buffer_timer.stop()
+        
+        event.accept()
