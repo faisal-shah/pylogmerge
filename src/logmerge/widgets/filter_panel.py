@@ -105,7 +105,7 @@ class DiscreteFilterWidget(FilterWidget):
     
     def __init__(self, field_name: str, field_schema: dict, values: list = None, parent=None):
         self.values = values or []
-        self.last_clicked_index = -1  # For shift+click range selection
+        self._is_handling_change = False  # Flag to prevent recursion in on_item_changed
         super().__init__(field_name, field_schema, parent)
     
     def create_filter_widget(self) -> QWidget:
@@ -165,58 +165,31 @@ class DiscreteFilterWidget(FilterWidget):
             item.setCheckState(Qt.Checked)  # Default to all selected
             self.list_widget.addItem(item)
         
-        # Connect signals for multi-selection checkbox toggling
+        # Connect signal for checkbox changes. Rely on default QListWidget selection behavior.
         self.list_widget.itemChanged.connect(self.on_item_changed)
-        self.list_widget.itemClicked.connect(self.on_item_clicked)
         
         return self.list_widget
     
-    def on_item_clicked(self, item):
-        """Handle item clicks for multi-selection and range selection."""
-        current_index = self.list_widget.row(item)
-        modifiers = QApplication.keyboardModifiers()
-        
-        # Handle Shift+click for range selection
-        if modifiers & Qt.ShiftModifier and self.last_clicked_index >= 0:
-            start_index = min(self.last_clicked_index, current_index)
-            end_index = max(self.last_clicked_index, current_index)
-            
-            # Clear current selection first
-            self.list_widget.clearSelection()
-            
-            # Select range
-            for i in range(start_index, end_index + 1):
-                self.list_widget.item(i).setSelected(True)
-        elif modifiers & Qt.ControlModifier:
-            # Ctrl+click adds/removes from selection - Qt handles this automatically
-            pass
-        else:
-            # Single click without modifiers - select only this item
-            self.list_widget.clearSelection()
-            item.setSelected(True)
-        
-        # Update last clicked index
-        self.last_clicked_index = current_index
-    
     def on_item_changed(self, item):
-        """Handle checkbox changes - apply to all selected items if multiple are selected."""
+        """Handle checkbox changes. If multiple items are selected, apply the change to all."""
+        # Prevent recursion if we are already handling a change
+        if self._is_handling_change:
+            return
+
         selected_items = self.list_widget.selectedItems()
         
-        # If multiple items are selected, apply checkbox change to all selected items
-        if len(selected_items) > 1:
+        # If more than one item is selected and the item that changed is one of them,
+        # apply the new check state to all selected items.
+        if len(selected_items) > 1 and item in selected_items:
+            self._is_handling_change = True
             new_state = item.checkState()
-            
-            # Temporarily disconnect signal to avoid recursion
-            self.list_widget.itemChanged.disconnect(self.on_item_changed)
-            
             try:
-                # Apply same state to all selected items except the one that triggered this
                 for selected_item in selected_items:
-                    if selected_item != item:
+                    if selected_item.checkState() != new_state:
                         selected_item.setCheckState(new_state)
             finally:
-                # Reconnect signal
-                self.list_widget.itemChanged.connect(self.on_item_changed)
+                # Ensure the flag is reset even if an error occurs
+                self._is_handling_change = False
         
         self.filter_changed.emit()
     
@@ -403,19 +376,15 @@ class FilterPanel(BasePanel):
     
     def set_schema(self, schema):
         """Set the schema and create filter widgets accordingly."""
-        print(f"DEBUG: FilterPanel.set_schema called with schema: {schema}")
         self.schema = schema
         self.clear_filters()
         
         if not schema or not hasattr(schema, 'fields'):
-            print("DEBUG: No schema or no fields attribute in schema")
             return
         
-        print(f"DEBUG: Processing {len(schema.fields)} fields")
         for i, field in enumerate(schema.fields):
             filter_widget = self.create_filter_for_field(field)
             if filter_widget:
-                print(f"DEBUG: Created filter widget for field: {field.get('name', 'unknown')}")
                 self.filter_widgets.append(filter_widget)
                 self.filter_layout.addWidget(filter_widget)
                 
@@ -425,12 +394,9 @@ class FilterPanel(BasePanel):
                     spacer_widget = QWidget()
                     spacer_widget.setFixedHeight(15)  # Increased from 8px to 15px for better separation
                     self.filter_layout.addWidget(spacer_widget)
-            else:
-                print(f"DEBUG: No filter widget created for field: {field.get('name', 'unknown')}")
         
         # Add stretch at the end
         self.filter_layout.addStretch()
-        print(f"DEBUG: Total filter widgets created: {len(self.filter_widgets)}")
     
     def create_filter_for_field(self, field_schema: dict) -> FilterWidget:
         """Create appropriate filter widget based on field schema."""
