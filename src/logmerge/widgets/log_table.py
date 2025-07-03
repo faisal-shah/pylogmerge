@@ -4,7 +4,6 @@ Log Table Model
 Contains the table model for displaying log entries in the main table view.
 """
 
-import time
 from pathlib import Path
 from typing import List, Dict
 from datetime import datetime
@@ -52,14 +51,6 @@ class LogTableModel(QAbstractTableModel):
             str: lambda v: v,
             type(None): lambda v: '',
         }
-        
-        # Performance profiling instrumentation
-        self.data_call_count = 0
-        self.data_total_time = 0.0
-        self.path_operation_time = 0.0
-        self.datetime_format_time = 0.0
-        self.field_access_time = 0.0
-        self.color_calculation_time = 0.0
     
     # Unified Cache Management Methods
     def _invalidate_cache(self, cache_types=None):
@@ -217,9 +208,7 @@ class LogTableModel(QAbstractTableModel):
         return None
         
     def data(self, index, role=Qt.DisplayRole):
-        """OPTIMIZED: Return data for a cell with major performance improvements."""
-        start_time = time.perf_counter()
-        
+        """Return data for a cell with optimizations."""
         # Fast bounds checking
         row = index.row()
         col = index.column()
@@ -230,61 +219,38 @@ class LogTableModel(QAbstractTableModel):
         entry = self.visible_entries[row]
         
         if role == Qt.DisplayRole:
-            # OPTIMIZATION 1: Index-based column dispatch (avoid string comparisons)
+            # Index-based column dispatch (avoid string comparisons)
             if col == self.source_file_col_index:
-                path_start = time.perf_counter()
-                result = self._get_filename_fast(entry.file_path)
-                self.path_operation_time += time.perf_counter() - path_start
-                self._update_profiling_stats(start_time)
-                return result
+                return self._get_filename_fast(entry.file_path)
             
-            # OPTIMIZATION 2: Direct field access with try/except (faster than .get())
+            # Direct field access with try/except (faster than .get())
             field_name = self.visible_columns[col]
-            field_start = time.perf_counter()
             try:
                 value = entry.fields[field_name]
             except KeyError:
                 value = ''
-            self.field_access_time += time.perf_counter() - field_start
             
-            # OPTIMIZATION 3: Type-based formatter dispatch (faster than isinstance)
-            datetime_start = time.perf_counter()
+            # Type-based formatter dispatch (faster than isinstance)
             formatter = self.formatters.get(type(value), str)
-            result = formatter(value)
-            self.datetime_format_time += time.perf_counter() - datetime_start
-            
-            self._update_profiling_stats(start_time)
-            return result
+            return formatter(value)
             
         elif role == Qt.UserRole:
             # Fast column dispatch for UserRole
             if col == self.source_file_col_index:
-                path_start = time.perf_counter()
-                result = self._get_filename_fast(entry.file_path)
-                self.path_operation_time += time.perf_counter() - path_start
-                self._update_profiling_stats(start_time)
-                return result
+                return self._get_filename_fast(entry.file_path)
             
             # Direct field access for raw values
             field_name = self.visible_columns[col]
-            field_start = time.perf_counter()
             try:
                 value = entry.fields[field_name]
             except KeyError:
                 value = ''
-            self.field_access_time += time.perf_counter() - field_start
-            self._update_profiling_stats(start_time)
             return value
             
         elif role == Qt.BackgroundRole:
-            # Color calculation (unchanged - already optimized with caching)
-            color_start = time.perf_counter()
-            result = self._get_file_color(entry.file_path)
-            self.color_calculation_time += time.perf_counter() - color_start
-            self._update_profiling_stats(start_time)
-            return result
+            # Color calculation (optimized with caching)
+            return self._get_file_color(entry.file_path)
             
-        self._update_profiling_stats(start_time)
         return None
         
     def _get_file_color(self, file_path: str):
@@ -337,73 +303,15 @@ class LogTableModel(QAbstractTableModel):
     def get_column_configuration(self) -> List[str]:
         """Return the current visible columns configuration."""
         return self.visible_columns.copy()
-    
-    def _update_profiling_stats(self, start_time):
-        """Update profiling statistics."""
-        self.data_call_count += 1
-        self.data_total_time += time.perf_counter() - start_time
-    
-    def get_profiling_stats(self):
-        """Get current profiling statistics."""
-        if self.data_call_count == 0:
-            return {
-                'calls': 0,
-                'total_time': 0,
-                'avg_time_per_call': 0,
-                'calls_per_second': 0,
-                'breakdown': {}
-            }
         
-        avg_time = self.data_total_time / self.data_call_count
-        calls_per_sec = self.data_call_count / self.data_total_time if self.data_total_time > 0 else 0
-        
-        return {
-            'calls': self.data_call_count,
-            'total_time': self.data_total_time,
-            'avg_time_per_call': avg_time,
-            'calls_per_second': calls_per_sec,
-            'breakdown': {
-                'path_operations': self.path_operation_time,
-                'datetime_formatting': self.datetime_format_time,
-                'field_access': self.field_access_time,
-                'color_calculations': self.color_calculation_time,
-            }
-        }
-    
-    def reset_profiling_stats(self):
-        """Reset profiling statistics."""
-        self.data_call_count = 0
-        self.data_total_time = 0.0
-        self.path_operation_time = 0.0
-        self.datetime_format_time = 0.0
-        self.field_access_time = 0.0
-        self.color_calculation_time = 0.0
-    
-    def print_profiling_report(self):
-        """Print a detailed profiling report."""
-        stats = self.get_profiling_stats()
-        
-        print("=== LogTableModel data() Performance Report ===")
-        print(f"Total data() calls: {stats['calls']:,}")
-        print(f"Total time: {stats['total_time']:.4f}s")
-        print(f"Average time per call: {stats['avg_time_per_call']*1000:.3f}ms")
-        print(f"Calls per second: {stats['calls_per_second']:,.0f}")
-        print()
-        print("Time breakdown:")
-        breakdown = stats['breakdown']
-        for operation, time_spent in breakdown.items():
-            percentage = (time_spent / stats['total_time'] * 100) if stats['total_time'] > 0 else 0
-            print(f"  {operation}: {time_spent:.4f}s ({percentage:.1f}%)")
-        print("=" * 50)
-    
     def _get_filename_fast(self, file_path: str) -> str:
-        """Fast filename extraction with pre-computed cache (32x speedup)."""
+        """Fast filename extraction with pre-computed cache."""
         if file_path not in self.filename_cache:
             self.filename_cache[file_path] = Path(file_path).name
         return self.filename_cache[file_path]
     
     def _format_datetime_fast(self, dt_value: datetime) -> str:
-        """Fast datetime formatting with pre-computation (20x speedup)."""
+        """Fast datetime formatting with pre-computation."""
         entry_id = id(dt_value)  # Use object id as cache key
         if entry_id not in self.precomputed_timestamps:
             self.precomputed_timestamps[entry_id] = dt_value.strftime('%Y-%m-%d %H:%M:%S')
