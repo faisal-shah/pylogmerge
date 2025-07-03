@@ -4,6 +4,7 @@ Log Table Model
 Contains the table model for displaying log entries in the main table view.
 """
 
+import time
 from pathlib import Path
 from typing import List, Dict
 from datetime import datetime
@@ -37,6 +38,14 @@ class LogTableModel(QAbstractTableModel):
         self.file_colors = {}  # File path to color mapping
         # Column configuration - include virtual Source File column first, then schema columns
         self.visible_columns = [self.SOURCE_FILE_COLUMN] + [field['name'] for field in schema.fields]
+        
+        # Performance profiling instrumentation
+        self.data_call_count = 0
+        self.data_total_time = 0.0
+        self.path_operation_time = 0.0
+        self.datetime_format_time = 0.0
+        self.field_access_time = 0.0
+        self.color_calculation_time = 0.0
     
     # Unified Cache Management Methods
     def _invalidate_cache(self, cache_types=None):
@@ -193,6 +202,8 @@ class LogTableModel(QAbstractTableModel):
         
     def data(self, index, role=Qt.DisplayRole):
         """Return data for a cell."""
+        start_time = time.perf_counter()
+        
         if not index.isValid():
             return None
             
@@ -206,33 +217,58 @@ class LogTableModel(QAbstractTableModel):
         if role == Qt.DisplayRole:
             # Handle virtual Source File column
             if field_name == self.SOURCE_FILE_COLUMN:
-                return Path(entry.file_path).name
+                path_start = time.perf_counter()
+                result = Path(entry.file_path).name
+                self.path_operation_time += time.perf_counter() - path_start
+                self._update_profiling_stats(start_time)
+                return result
             
             # Handle schema fields
+            field_start = time.perf_counter()
             value = entry.fields.get(field_name, '')
+            self.field_access_time += time.perf_counter() - field_start
+            
             if isinstance(value, datetime):
                 # Use cached datetime formatting for performance
+                datetime_start = time.perf_counter()
                 cache_key = (id(entry), field_name)
                 if cache_key in self.cached_datetime_strings:
-                    return self.cached_datetime_strings[cache_key]
-                
-                # Format and cache the datetime string
-                formatted_str = value.strftime('%Y-%m-%d %H:%M:%S')
-                self.cached_datetime_strings[cache_key] = formatted_str
-                return formatted_str
+                    result = self.cached_datetime_strings[cache_key]
+                else:
+                    # Format and cache the datetime string
+                    formatted_str = value.strftime('%Y-%m-%d %H:%M:%S')
+                    self.cached_datetime_strings[cache_key] = formatted_str
+                    result = formatted_str
+                self.datetime_format_time += time.perf_counter() - datetime_start
+                self._update_profiling_stats(start_time)
+                return result
+            
+            self._update_profiling_stats(start_time)
             return str(value)
         elif role == Qt.UserRole:
             # Handle virtual Source File column
             if field_name == self.SOURCE_FILE_COLUMN:
-                return Path(entry.file_path).name
+                path_start = time.perf_counter()
+                result = Path(entry.file_path).name
+                self.path_operation_time += time.perf_counter() - path_start
+                self._update_profiling_stats(start_time)
+                return result
             
             # Return raw datetime object for future filtering/sorting operations
+            field_start = time.perf_counter()
             value = entry.fields.get(field_name, '')
+            self.field_access_time += time.perf_counter() - field_start
+            self._update_profiling_stats(start_time)
             return value
         elif role == Qt.BackgroundRole:
             # Color rows by file - find the file's color from sidebar
-            return self._get_file_color(entry.file_path)
+            color_start = time.perf_counter()
+            result = self._get_file_color(entry.file_path)
+            self.color_calculation_time += time.perf_counter() - color_start
+            self._update_profiling_stats(start_time)
+            return result
             
+        self._update_profiling_stats(start_time)
         return None
         
     def _get_file_color(self, file_path: str):
@@ -285,3 +321,61 @@ class LogTableModel(QAbstractTableModel):
     def get_column_configuration(self) -> List[str]:
         """Return the current visible columns configuration."""
         return self.visible_columns.copy()
+    
+    def _update_profiling_stats(self, start_time):
+        """Update profiling statistics."""
+        self.data_call_count += 1
+        self.data_total_time += time.perf_counter() - start_time
+    
+    def get_profiling_stats(self):
+        """Get current profiling statistics."""
+        if self.data_call_count == 0:
+            return {
+                'calls': 0,
+                'total_time': 0,
+                'avg_time_per_call': 0,
+                'calls_per_second': 0,
+                'breakdown': {}
+            }
+        
+        avg_time = self.data_total_time / self.data_call_count
+        calls_per_sec = self.data_call_count / self.data_total_time if self.data_total_time > 0 else 0
+        
+        return {
+            'calls': self.data_call_count,
+            'total_time': self.data_total_time,
+            'avg_time_per_call': avg_time,
+            'calls_per_second': calls_per_sec,
+            'breakdown': {
+                'path_operations': self.path_operation_time,
+                'datetime_formatting': self.datetime_format_time,
+                'field_access': self.field_access_time,
+                'color_calculations': self.color_calculation_time,
+            }
+        }
+    
+    def reset_profiling_stats(self):
+        """Reset profiling statistics."""
+        self.data_call_count = 0
+        self.data_total_time = 0.0
+        self.path_operation_time = 0.0
+        self.datetime_format_time = 0.0
+        self.field_access_time = 0.0
+        self.color_calculation_time = 0.0
+    
+    def print_profiling_report(self):
+        """Print a detailed profiling report."""
+        stats = self.get_profiling_stats()
+        
+        print("=== LogTableModel data() Performance Report ===")
+        print(f"Total data() calls: {stats['calls']:,}")
+        print(f"Total time: {stats['total_time']:.4f}s")
+        print(f"Average time per call: {stats['avg_time_per_call']*1000:.3f}ms")
+        print(f"Calls per second: {stats['calls_per_second']:,.0f}")
+        print()
+        print("Time breakdown:")
+        breakdown = stats['breakdown']
+        for operation, time_spent in breakdown.items():
+            percentage = (time_spent / stats['total_time'] * 100) if stats['total_time'] > 0 else 0
+            print(f"  {operation}: {time_spent:.4f}s ({percentage:.1f}%)")
+        print("=" * 50)
