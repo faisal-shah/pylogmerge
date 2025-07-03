@@ -8,7 +8,8 @@ Dynamically creates appropriate filter widgets for each field in the schema.
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, 
     QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QListWidget,
-    QListWidgetItem, QDateTimeEdit, QScrollArea, QFrame, QApplication
+    QListWidgetItem, QDateTimeEdit, QScrollArea, QFrame, QApplication,
+    QSizePolicy
 )
 from PyQt5.QtCore import pyqtSignal, QDateTime, Qt
 from PyQt5.QtGui import QFont
@@ -35,36 +36,48 @@ class FilterWidget(QWidget):
     def setup_ui(self):
         """Set up the basic filter UI structure."""
         layout = QVBoxLayout()
-        layout.setContentsMargins(8, 4, 8, 4)
-        layout.setSpacing(4)
+        layout.setContentsMargins(2, 0, 2, 0)  # Zero top/bottom margins
+        layout.setSpacing(0)  # Zero spacing between header and filter widget
         
         # Header with field name and enable checkbox
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(2)  # Tight spacing between checkbox and label
         
         self.enable_cb = QCheckBox()
         self.enable_cb.setChecked(False)
         self.enable_cb.toggled.connect(self.on_enabled_changed)
         
         field_label = QLabel(self.field_name)
-        field_label.setFont(QFont("", 9, QFont.Bold))
+        field_label.setFont(QFont("", 8, QFont.Bold))  # Smaller font
         
         header_layout.addWidget(self.enable_cb)
         header_layout.addWidget(field_label)
         header_layout.addStretch()
         
-        layout.addLayout(header_layout)
+        # Create header widget with fixed height to minimize space
+        header_widget = QWidget()
+        header_widget.setLayout(header_layout)
+        header_widget.setFixedHeight(16)  # Very compact header
+        header_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        
+        layout.addWidget(header_widget)
         
         # Filter-specific widget (implemented by subclasses)
         self.filter_widget = self.create_filter_widget()
         self.filter_widget.setEnabled(False)
         layout.addWidget(self.filter_widget)
         
-        # Separator line
-        line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setFrameShadow(QFrame.Sunken)
-        layout.addWidget(line)
+        # Add subtle styling to make filter widgets more distinct
+        self.setStyleSheet("""
+            FilterWidget {
+                background-color: #fafafa;
+                border: 1px solid #e0e0e0;
+                border-radius: 3px;
+                padding: 3px;
+                margin: 1px;
+            }
+        """)
         
         self.setLayout(layout)
     
@@ -98,8 +111,28 @@ class DiscreteFilterWidget(FilterWidget):
     def create_filter_widget(self) -> QWidget:
         """Create a list widget with checkboxes for discrete values."""
         self.list_widget = QListWidget()
-        self.list_widget.setMaximumHeight(120)
+        self.list_widget.setMaximumHeight(100)  # Reduced from 120
+        self.list_widget.setMinimumHeight(40)   # Reduced from 60
         self.list_widget.setSelectionMode(QListWidget.ExtendedSelection)  # Enable multi-selection
+        
+        # Set very tight spacing and size policy for list items
+        self.list_widget.setSpacing(0)  # Remove item spacing entirely
+        self.list_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        
+        # Make list items more compact with tighter styling
+        self.list_widget.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #ccc;
+                margin: 0px;
+                padding: 0px;
+            }
+            QListWidget::item {
+                padding: 1px 2px;
+                margin: 0px;
+                border: none;
+                height: 16px;
+            }
+        """)
         
         # Populate with values
         for value in self.values:
@@ -337,7 +370,7 @@ class FilterPanel(BasePanel):
         self.filter_container = QWidget()
         self.filter_layout = QVBoxLayout()
         self.filter_layout.setContentsMargins(0, 0, 0, 0)
-        self.filter_layout.setSpacing(0)
+        self.filter_layout.setSpacing(0)  # Remove spacing between filter widgets
         
         self.filter_container.setLayout(self.filter_layout)
         scroll_area.setWidget(self.filter_container)
@@ -355,12 +388,19 @@ class FilterPanel(BasePanel):
             return
         
         print(f"DEBUG: Processing {len(schema.fields)} fields")
-        for field in schema.fields:
+        for i, field in enumerate(schema.fields):
             filter_widget = self.create_filter_for_field(field)
             if filter_widget:
                 print(f"DEBUG: Created filter widget for field: {field.get('name', 'unknown')}")
                 self.filter_widgets.append(filter_widget)
                 self.filter_layout.addWidget(filter_widget)
+                
+                # Add spacing between filter widgets (except for the last one)
+                if i < len(schema.fields) - 1:
+                    # Create a spacer widget with more vertical space
+                    spacer_widget = QWidget()
+                    spacer_widget.setFixedHeight(15)  # Increased from 8px to 15px for better separation
+                    self.filter_layout.addWidget(spacer_widget)
             else:
                 print(f"DEBUG: No filter widget created for field: {field.get('name', 'unknown')}")
         
