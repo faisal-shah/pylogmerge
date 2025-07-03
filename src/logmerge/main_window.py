@@ -117,6 +117,9 @@ class MergedLogViewer(QMainWindow):
         # Connect file picker panel signal
         self.file_picker_panel.files_changed.connect(self.on_files_changed)
         
+        # Connect filter panel signal
+        self.filter_panel.apply_clicked.connect(self.on_filters_applied)
+        
         self.main_splitter.addWidget(self.panel_container)
         
         # Create main table view area
@@ -307,6 +310,27 @@ class MergedLogViewer(QMainWindow):
             status_msg = READY_STATUS
         self.statusBar().showMessage(status_msg)
         
+    def on_filters_applied(self):
+        """Handle filter changes from the filter panel."""
+        # Get the standardized filters from the filter panel
+        field_filters = self.filter_panel.get_active_filters()
+        
+        # Apply filters to the table model
+        self.log_table_model.apply_filters(field_filters)
+        
+        # Update status to show filter is active
+        if field_filters:
+            filter_count = len(field_filters)
+            self.statusBar().showMessage(f"Filters applied: {filter_count} active")
+        else:
+            # No filters, show regular status
+            checked_files = self.file_picker_panel.get_checked_files()
+            all_files = self.file_picker_panel.get_all_files()
+            status_msg = FILE_COUNT_STATUS_FORMAT.format(total=len(all_files), selected=len(checked_files))
+            if not all_files:
+                status_msg = READY_STATUS
+            self.statusBar().showMessage(status_msg)
+    
     def _update_file_colors(self):
         """Update the file colors in the table model from the sidebar."""
         file_list = self.file_picker_panel.file_list

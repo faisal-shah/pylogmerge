@@ -4,6 +4,7 @@ Log Table Model
 Contains the table model for displaying log entries in the main table view.
 """
 
+import re
 from pathlib import Path
 from typing import List, Dict
 from datetime import datetime
@@ -26,15 +27,16 @@ class LogTableModel(QAbstractTableModel):
         self.schema = schema
         self.log_entries = []
         self.checked_files = set()
+        self.field_filters = {}  # Field-based filters in standardized format
         self.visible_entries = []
-        self.display_cache = {}
+        self.entry_display_cache = {}  # Single entry-level cache: entry_id -> formatted_data_dict
         self.file_colors = {}  # File path to color mapping
         # Column configuration - include virtual Source File column first, then schema columns
         self.visible_columns = [self.SOURCE_FILE_COLUMN] + [field['name'] for field in schema.fields]
         
     def _invalidate_cache(self):
-        """Invalidate all caches and rebuild visible entries."""
-        self.display_cache.clear()
+        """Simple cache invalidation - clear everything and rebuild visible entries."""
+        self.entry_display_cache.clear()
         self._rebuild_visible_entries()
         
     def update_checked_files(self, checked_files: List[str]):
@@ -45,36 +47,94 @@ class LogTableModel(QAbstractTableModel):
         self.endResetModel()
         
     def _rebuild_visible_entries(self):
-        """Filter log entries to what is visible without rebuilding the display cache."""
-        self.visible_entries = [entry for entry in self.log_entries 
-                              if entry.file_path in self.checked_files]
+        """Filter log entries by both file selection AND field filters."""
+        self.visible_entries = [
+            entry for entry in self.log_entries 
+            if entry.file_path in self.checked_files and self._matches_field_filters(entry)
+        ]
         
-    def _get_cached_row(self, entry: LogEntry) -> tuple:
-        """Get a display-ready row from cache or build it if not present."""
+    def _matches_field_filters(self, entry: LogEntry) -> bool:
+        """Check if a log entry matches all active field filters."""
+        if not self.field_filters:
+            return True  # No field filters active, so entry matches
+        
+        for field_name, filter_criteria in self.field_filters.items():
+            entry_value = entry.fields.get(field_name)
+            filter_type = filter_criteria.get("type")
+            
+            # Apply filter based on type
+            if filter_type == "discrete":
+                selected_values = filter_criteria.get("selected", set())
+                if entry_value not in selected_values:
+                    return False
+                    
+            elif filter_type == "numeric_range":
+                min_val = filter_criteria.get("min")
+                max_val = filter_criteria.get("max")
+                if min_val is not None and (entry_value is None or entry_value < min_val):
+                    return False
+                if max_val is not None and (entry_value is None or entry_value > max_val):
+                    return False
+                    
+            elif filter_type == "text":
+                pattern = filter_criteria.get("pattern", "")
+                if pattern and entry_value is not None:
+                    try:
+                        if not re.search(pattern, str(entry_value), re.IGNORECASE):
+                            return False
+                    except re.error:
+                        # If regex is invalid, fall back to simple string matching
+                        if pattern.lower() not in str(entry_value).lower():
+                            return False
+                elif pattern:  # Pattern exists but entry_value is None
+                    return False
+                    
+            elif filter_type == "datetime_range":
+                from_dt = filter_criteria.get("from")
+                to_dt = filter_criteria.get("to")
+                if from_dt is not None and (entry_value is None or entry_value < from_dt):
+                    return False
+                if to_dt is not None and (entry_value is None or entry_value > to_dt):
+                    return False
+        
+        return True  # All filters passed
+        
+    def _get_cached_entry_data(self, entry: LogEntry) -> dict:
+        """Get or build cached display data for an entry."""
         entry_id = id(entry)
-        if entry_id in self.display_cache:
-            return self.display_cache[entry_id]
-
-        # If not in cache, build it
-        row_data = []
-        for col_name in self.visible_columns:
-            if col_name == self.SOURCE_FILE_COLUMN:
-                value = Path(entry.file_path).name
-            else:
-                raw_value = entry.fields.get(col_name)
-                if isinstance(raw_value, datetime):
-                    value = raw_value.strftime('%Y-%m-%d %H:%M:%S')
-                elif raw_value is None:
-                    value = ''
-                else:
-                    value = str(raw_value)
-            row_data.append(value)
         
-        bg_color = self._get_file_color(entry.file_path)
-        cached_row = (row_data, bg_color)
-        self.display_cache[entry_id] = cached_row
-        return cached_row
-
+        if entry_id not in self.entry_display_cache:
+            # Pre-compute ALL expensive operations once
+            cached_data = {
+                'filename': Path(entry.file_path).name,  # Expensive path operation
+                'file_color': self._get_file_color(entry.file_path),  # Color calculation
+                'formatted_fields': {}
+            }
+            
+            # Pre-format all fields that need formatting
+            for field_name in self.visible_columns:
+                if field_name == self.SOURCE_FILE_COLUMN:
+                    cached_data['formatted_fields'][field_name] = cached_data['filename']
+                else:
+                    raw_value = entry.fields.get(field_name)
+                    if isinstance(raw_value, datetime):
+                        cached_data['formatted_fields'][field_name] = raw_value.strftime('%Y-%m-%d %H:%M:%S')
+                    elif raw_value is None:
+                        cached_data['formatted_fields'][field_name] = ''
+                    else:
+                        cached_data['formatted_fields'][field_name] = str(raw_value)
+            
+            self.entry_display_cache[entry_id] = cached_data
+            
+        return self.entry_display_cache[entry_id]
+        
+    def apply_filters(self, field_filters: dict):
+        """Apply field filters and rebuild visible entries."""
+        self.field_filters = field_filters
+        self.beginResetModel()
+        self._rebuild_visible_entries()
+        self.endResetModel()
+    
     def add_log_entry(self, entry: LogEntry):
         """Add a new log entry using binary search for optimal insertion."""
         # Use binary search to find insertion position
@@ -83,8 +143,8 @@ class LogTableModel(QAbstractTableModel):
         # Add to log entries
         self.log_entries.insert(insert_index, entry)
         
-        # If entry is visible, update visible entries and notify model
-        if entry.file_path in self.checked_files:
+        # If entry is visible (passes both file and field filters), update visible entries and notify model
+        if entry.file_path in self.checked_files and self._matches_field_filters(entry):
             visible_insert_index = self._binary_search_visible_insert_position(entry.timestamp)
             self.beginInsertRows(QModelIndex(), visible_insert_index, visible_insert_index)
             self.visible_entries.insert(visible_insert_index, entry)
@@ -151,7 +211,7 @@ class LogTableModel(QAbstractTableModel):
         self.beginResetModel()
         self.log_entries.clear()
         self.visible_entries.clear()
-        self.display_cache.clear()
+        self.entry_display_cache.clear()
         self.endResetModel()
         
     def rowCount(self, parent=QModelIndex()):
@@ -170,7 +230,7 @@ class LogTableModel(QAbstractTableModel):
         return None
         
     def data(self, index, role=Qt.DisplayRole):
-        """Return data for a cell from the cache."""
+        """Ultra-fast data method using pre-computed cache."""
         row = index.row()
         col = index.column()
         
@@ -178,10 +238,11 @@ class LogTableModel(QAbstractTableModel):
             return None
             
         entry = self.visible_entries[row]
-        cached_row, background_color = self._get_cached_row(entry)
+        cached_data = self._get_cached_entry_data(entry)
         
         if role == Qt.DisplayRole:
-            return cached_row[col]
+            column_name = self.visible_columns[col]
+            return cached_data['formatted_fields'][column_name]
             
         elif role == Qt.UserRole:
             # Return the raw value for filtering/sorting
@@ -191,7 +252,7 @@ class LogTableModel(QAbstractTableModel):
             return entry.fields.get(column_name)
             
         elif role == Qt.BackgroundRole:
-            return background_color
+            return cached_data['file_color']
             
         return None
         

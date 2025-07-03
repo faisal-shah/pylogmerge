@@ -47,7 +47,6 @@ class FilterWidget(QWidget):
         self.enable_cb.toggled.connect(self.on_enabled_changed)
         
         field_label = QLabel(self.field_name)
-        field_label.setFont(QFont("", 8, QFont.Bold))  # Smaller font
         
         header_layout.addWidget(self.enable_cb)
         header_layout.addWidget(field_label)
@@ -441,12 +440,43 @@ class FilterPanel(BasePanel):
                 break
     
     def get_active_filters(self) -> dict:
-        """Get all currently active filters."""
-        active_filters = {}
+        """Get all currently active filters in standardized format."""
+        field_filters = {}
+        
         for widget in self.filter_widgets:
             if widget.is_filter_active():
-                active_filters[widget.field_name] = widget.get_filter_value()
-        return active_filters
+                field_name = widget.field_name
+                filter_value = widget.get_filter_value()
+                
+                if filter_value is None:
+                    continue
+                
+                # Convert to standardized format based on widget type
+                if isinstance(widget, DiscreteFilterWidget):
+                    # Convert list to set for faster lookups
+                    field_filters[field_name] = {
+                        "type": "discrete",
+                        "selected": set(filter_value) if filter_value else set()
+                    }
+                elif isinstance(widget, NumericRangeFilterWidget):
+                    field_filters[field_name] = {
+                        "type": "numeric_range",
+                        "min": filter_value.get("min"),
+                        "max": filter_value.get("max")
+                    }
+                elif isinstance(widget, TextFilterWidget):
+                    field_filters[field_name] = {
+                        "type": "text",
+                        "pattern": filter_value
+                    }
+                elif isinstance(widget, DateTimeRangeFilterWidget):
+                    field_filters[field_name] = {
+                        "type": "datetime_range",
+                        "from": filter_value.get("from"),
+                        "to": filter_value.get("to")
+                    }
+        
+        return field_filters
     
     def update_discrete_values_from_data(self, log_table_model):
         """Update discrete filter values by scanning actual log data."""
