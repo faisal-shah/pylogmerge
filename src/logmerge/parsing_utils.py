@@ -52,19 +52,9 @@ def convert_field_value(raw_value: str, field: Dict[str, Any], enum_lookups: Dic
             
     elif field_type == 'enum':
         value = int(raw_value)
-        field_name = field['name']
-        
-        # Use pre-built lookup dictionary for O(1) performance
-        if field_name in enum_lookups:
-            enum_lookup = enum_lookups[field_name]
-            return enum_lookup.get(value, str(value))  # Return string of number if enum not found
-        else:
-            # Fallback to old method if no lookup available
-            enum_values = field.get('enum_values', [])
-            for enum_item in enum_values:
-                if enum_item['value'] == value:
-                    return enum_item['name']
-            return str(value)  # Return string of number if enum not found
+        # Return the integer value directly for uniform data format
+        # The display layer will handle conversion to enum names when needed
+        return value
         
     else:
         return raw_value

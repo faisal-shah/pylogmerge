@@ -99,6 +99,16 @@ class LogTableModel(QAbstractTableModel):
         
         return True  # All filters passed
         
+    def _get_field_schema(self, field_name: str) -> dict:
+        """Get the schema definition for a specific field."""
+        if not self.schema or not hasattr(self.schema, 'fields'):
+            return None
+        
+        for field in self.schema.fields:
+            if field.get('name') == field_name:
+                return field
+        return None
+        
     def _get_cached_entry_data(self, entry: LogEntry) -> dict:
         """Get or build cached display data for an entry."""
         entry_id = id(entry)
@@ -122,7 +132,16 @@ class LogTableModel(QAbstractTableModel):
                     elif raw_value is None:
                         cached_data['formatted_fields'][field_name] = ''
                     else:
-                        cached_data['formatted_fields'][field_name] = str(raw_value)
+                        # Check if this field is an enum and convert accordingly
+                        field_schema = self._get_field_schema(field_name)
+                        if field_schema and field_schema.get('type') == 'enum':
+                            # Convert enum integer value to display string
+                            enum_values = field_schema.get('enum_values', [])
+                            enum_map = {item['value']: item['name'] for item in enum_values}
+                            display_value = enum_map.get(raw_value, str(raw_value))
+                            cached_data['formatted_fields'][field_name] = display_value
+                        else:
+                            cached_data['formatted_fields'][field_name] = str(raw_value)
             
             self.entry_display_cache[entry_id] = cached_data
             

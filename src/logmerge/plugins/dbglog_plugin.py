@@ -12,6 +12,9 @@ The parse_raw_line function takes precedence over the regex pattern when provide
 import re
 from datetime import datetime
 from typing import Dict, Optional, Any
+
+import sys
+from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_config import get_logger
 
@@ -61,21 +64,21 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
     Custom parsing function for debug log lines.
     
     This function should parse the raw line and return a dictionary with field values
-    fully converted and ready for display. The plugin is responsible for all type 
-    conversions including enum int-to-string conversion and timestamp parsing.
+    in their original data types. For enum fields, return the original integer values,
+    not the converted string names. The display layer will handle enum-to-string conversion.
     
     Args:
         raw_line: The raw log line to parse
         
     Returns:
-        Dictionary with fully converted field values (ready for display), or None if parsing fails
+        Dictionary with original field values (integers for enums), or None if parsing fails
         
     Example log line:
         "3 1640995200.123456 auth_module User authentication failed"
         
     Expected return:
         {
-            'severity': 'ERROR',  # enum converted to string name
+            'severity': 3,  # Integer value, not converted to "ERROR"
             'timestamp': datetime(2021, 12, 31, 18, 0, 0, 123456),  # datetime object
             'module': 'auth_module',  # string
             'message': 'User authentication failed'  # string
@@ -98,19 +101,18 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
         module_str = parts[2]
         message_str = parts[3]
         
-        # Parse and convert severity to int, then to enum string
+        # Parse severity to int (keep as original integer value)
         if not severity_str.isdigit():
             return None
-        severity_int = int(severity_str)
+        severity = int(severity_str)  # Store as integer, not converted to string
         
-        # Get severity enum mapping from SCHEMA
+        # Validate that the severity value is within the expected range
         severity_field = next((field for field in SCHEMA['fields'] if field['name'] == 'severity'), None)
         if severity_field and severity_field['type'] == 'enum':
             enum_values = severity_field.get('enum_values', [])
-            severity_enum_map = {item['value']: item['name'] for item in enum_values}
-            severity = severity_enum_map.get(severity_int, str(severity_int))
-        else:
-            severity = str(severity_int)  # Fallback to string representation
+            valid_values = {item['value'] for item in enum_values}
+            if severity not in valid_values:
+                return None  # Invalid severity value
             
         # Parse and convert timestamp to datetime object
         if timestamp_str == '-':
@@ -127,9 +129,10 @@ def parse_raw_line(raw_line: str) -> Optional[Dict[str, Any]]:
         if module_str != '-' and not re.match(r'^[a-zA-Z][a-zA-Z0-9_]*$', module_str):
             return None
         
-        # Return fully converted values ready for display
+        # Return the original values (integers for enums, not converted strings)
+        # The display layer will handle the conversion to display names
         return {
-            'severity': severity,     # Already converted to enum string
+            'severity': severity,     # Integer value (0-7), not converted to string
             'timestamp': timestamp,   # Already converted to datetime object
             'module': module_str,     # String value
             'message': message_str    # String value
