@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, 
     QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QListWidget,
     QListWidgetItem, QDateTimeEdit, QScrollArea, QFrame, QApplication,
-    QSizePolicy
+    QSizePolicy, QPushButton
 )
 from PyQt5.QtCore import pyqtSignal, QDateTime, Qt
 from PyQt5.QtGui import QFont
@@ -23,8 +23,6 @@ from .panels import BasePanel
 
 class FilterWidget(QWidget):
     """Base class for individual field filter widgets."""
-    
-    filter_changed = pyqtSignal()
     
     def __init__(self, field_name: str, field_schema: dict, parent=None):
         super().__init__(parent)
@@ -89,7 +87,6 @@ class FilterWidget(QWidget):
         """Handle filter enable/disable."""
         self.enabled = enabled
         self.filter_widget.setEnabled(enabled)
-        self.filter_changed.emit()
     
     def get_filter_value(self):
         """Get the current filter value. Implemented by subclasses."""
@@ -191,8 +188,6 @@ class DiscreteFilterWidget(FilterWidget):
                 # Ensure the flag is reset even if an error occurs
                 self._is_handling_change = False
         
-        self.filter_changed.emit()
-    
     def get_filter_value(self):
         """Get list of selected values."""
         if not self.enabled:
@@ -258,9 +253,6 @@ class NumericRangeFilterWidget(FilterWidget):
         layout.addLayout(min_layout)
         layout.addLayout(max_layout)
         
-        self.min_input.valueChanged.connect(lambda: self.filter_changed.emit())
-        self.max_input.valueChanged.connect(lambda: self.filter_changed.emit())
-        
         widget.setLayout(layout)
         return widget
     
@@ -282,7 +274,6 @@ class TextFilterWidget(FilterWidget):
         """Create text input with regex support."""
         self.text_input = QLineEdit()
         self.text_input.setPlaceholderText("Enter text or regex pattern...")
-        self.text_input.textChanged.connect(lambda: self.filter_changed.emit())
         return self.text_input
     
     def get_filter_value(self):
@@ -321,9 +312,6 @@ class DateTimeRangeFilterWidget(FilterWidget):
         layout.addLayout(from_layout)
         layout.addLayout(to_layout)
         
-        self.from_input.dateTimeChanged.connect(lambda: self.filter_changed.emit())
-        self.to_input.dateTimeChanged.connect(lambda: self.filter_changed.emit())
-        
         widget.setLayout(layout)
         return widget
     
@@ -340,6 +328,8 @@ class DateTimeRangeFilterWidget(FilterWidget):
 
 class FilterPanel(BasePanel):
     """Panel containing all field filters based on schema."""
+    
+    apply_clicked = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__("filters", parent)
@@ -373,6 +363,11 @@ class FilterPanel(BasePanel):
         scroll_area.setWidget(self.filter_container)
         
         layout.addWidget(scroll_area)
+        
+        # Add Apply button at the bottom
+        self.apply_button = QPushButton("Apply Filters")
+        self.apply_button.clicked.connect(self.apply_clicked.emit)
+        layout.addWidget(self.apply_button)
     
     def set_schema(self, schema):
         """Set the schema and create filter widgets accordingly."""
