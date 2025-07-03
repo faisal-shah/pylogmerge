@@ -18,7 +18,7 @@ from .plugin_utils import LogParsingPlugin
 from .data_structures import SharedLogBuffer
 from .file_monitoring import LogParsingWorker
 from .widgets import (
-    ActivityBar, PanelContainer, FilePickerPanel, LogTableModel, FileListItemWidget
+    ActivityBar, PanelContainer, FilePickerPanel, FilterPanel, LogTableModel, FileListItemWidget
 )
 from .dialogs import SchemaSelectionDialog, ColumnConfigurationDialog
 from .constants import (
@@ -80,6 +80,7 @@ class MergedLogViewer(QMainWindow):
         # Activity Bar (permanent left sidebar)
         self.activity_bar = ActivityBar()
         self.activity_bar.files_button_clicked.connect(self.on_files_activity_toggled)
+        self.activity_bar.filter_button_clicked.connect(self.on_filters_activity_toggled)
         layout.addWidget(self.activity_bar)
         
         # Create main splitter and panels
@@ -99,6 +100,19 @@ class MergedLogViewer(QMainWindow):
         # Create and add panels
         self.file_picker_panel = FilePickerPanel()
         self.panel_container.add_panel(self.file_picker_panel)
+        
+        self.filter_panel = FilterPanel()
+        self.panel_container.add_panel(self.filter_panel)
+        
+        # Set schema for filter panel if available
+        if self.schema:
+            print(f"DEBUG: Setting schema on filter panel: {self.schema.fields}")
+            self.filter_panel.set_schema(self.schema)
+            # Also update discrete values if there's already data in the log table
+            if hasattr(self, 'log_table_model'):
+                self.filter_panel.update_discrete_values_from_data(self.log_table_model)
+        else:
+            print("DEBUG: No schema available to set on filter panel")
         
         # Connect file picker panel signal
         self.file_picker_panel.files_changed.connect(self.on_files_changed)
@@ -216,6 +230,14 @@ class MergedLogViewer(QMainWindow):
         try:
             # Load and create plugin from file
             self.schema = LogParsingPlugin.from_file(schema_dialog.selected_schema_path)
+            
+            # Set schema for filter panel
+            if hasattr(self, 'filter_panel'):
+                self.filter_panel.set_schema(self.schema)
+                # Also update discrete values if there's already data
+                if hasattr(self, 'log_table_model'):
+                    self.filter_panel.update_discrete_values_from_data(self.log_table_model)
+            
             return True
             
         except Exception as e:
@@ -247,6 +269,10 @@ class MergedLogViewer(QMainWindow):
         
         # Batch add to table model
         self.log_table_model.add_entries_batch(entries)
+        
+        # Update discrete filter values with new data (only if significant amount of new data)
+        if hasattr(self, 'filter_panel') and len(entries) >= 10:  # Only update for batches of 10+ entries
+            self.filter_panel.update_discrete_values_from_data(self.log_table_model)
         
         QApplication.processEvents()
         
@@ -312,6 +338,23 @@ class MergedLogViewer(QMainWindow):
             self.main_splitter.setSizes([0, current_sizes[0] + current_sizes[1]])
             
             self.logger.debug("Files panel hidden")
+    
+    def on_filters_activity_toggled(self, is_active: bool) -> None:
+        """Handle filters activity bar button toggle."""
+        if is_active:
+            self.panel_container.show_panel('filters')
+            
+            current_sizes = self.main_splitter.sizes()
+            self.main_splitter.setSizes([PANEL_MIN_WIDTH, current_sizes[0] + current_sizes[1] - PANEL_MIN_WIDTH])
+            
+            self.logger.debug("Filters panel shown")
+        else:
+            self.panel_container.hide_panel()
+            
+            current_sizes = self.main_splitter.sizes()
+            self.main_splitter.setSizes([0, current_sizes[0] + current_sizes[1]])
+            
+            self.logger.debug("Filters panel hidden")
     
     def open_column_configuration(self) -> None:
         """Open the column configuration dialog."""

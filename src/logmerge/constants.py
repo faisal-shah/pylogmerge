@@ -59,6 +59,7 @@ ACTIVITY_BAR_SPACING = 5  # Spacing between buttons
 # Panel Constants
 PANEL_MIN_WIDTH = 250  # Minimum width for panels
 PANEL_MAX_WIDTH = 400  # Maximum width for panels
+PANEL_HEADER_HEIGHT = 40  # Height of panel headers
 
 # ============================================================================
 # STRING CONSTANTS - UI LABELS
@@ -66,6 +67,7 @@ PANEL_MAX_WIDTH = 400  # Maximum width for panels
 
 WINDOW_TITLE = "Merged Log Viewer"
 LOG_FILES_TITLE = "Log Files"
+FILTERS_TITLE = "Filters"
 SELECT_ALL_TEXT = "Select All"
 DESELECT_ALL_TEXT = "Deselect All"
 ADD_BUTTON_EMOJI = "➕"
@@ -76,6 +78,8 @@ COLUMN_CONFIG_ACTION_TEXT = "⚙ Configure Columns"
 # Activity Bar Button Text and Tooltips
 FILES_ACTIVITY_BUTTON_TEXT = "📁"
 FILES_ACTIVITY_TOOLTIP = "Show/hide file picker panel"
+FILTERS_ACTIVITY_BUTTON_TEXT = "🔍"
+FILTERS_ACTIVITY_TOOLTIP = "Show/hide filter panel"
 
 # ============================================================================
 # BUTTON LABELS

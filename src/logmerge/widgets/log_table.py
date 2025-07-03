@@ -151,7 +151,21 @@ class LogTableModel(QAbstractTableModel):
                 right = mid
         
         return left
+    
+    def get_unique_field_values(self, field_name: str) -> List:
+        """Get unique values for a specific field from all log entries."""
+        unique_values = set()
         
+        for entry in self.log_entries:
+            if field_name in entry.fields:
+                value = entry.fields[field_name]
+                if value is not None:
+                    unique_values.add(value)
+        
+        # Return sorted list for consistent display
+        sorted_values = sorted(list(unique_values))
+        return sorted_values
+    
     def clear_entries(self):
         """Clear all log entries."""
         self.beginResetModel()

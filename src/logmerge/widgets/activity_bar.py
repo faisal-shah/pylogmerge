@@ -10,6 +10,7 @@ from PyQt5.QtCore import pyqtSignal
 from ..constants import (
     ACTIVITY_BAR_WIDTH, ACTIVITY_BAR_SPACING, ACTIVITY_BAR_BUTTON_SIZE,
     FILES_ACTIVITY_BUTTON_TEXT, FILES_ACTIVITY_TOOLTIP,
+    FILTERS_ACTIVITY_BUTTON_TEXT, FILTERS_ACTIVITY_TOOLTIP,
     ACTIVITY_BUTTON_ACTIVE_STYLE, ACTIVITY_BUTTON_INACTIVE_STYLE
 )
 
@@ -19,6 +20,7 @@ class ActivityBar(QWidget):
     
     # Signals for button state changes
     files_button_clicked = pyqtSignal(bool)  # True = active, False = inactive
+    filter_button_clicked = pyqtSignal(bool)  # True = active, False = inactive
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -45,6 +47,14 @@ class ActivityBar(QWidget):
         self.files_button.clicked.connect(self.on_files_button_clicked)
         layout.addWidget(self.files_button)
         
+        # Filter button (🔍)
+        self.filter_button = QPushButton(FILTERS_ACTIVITY_BUTTON_TEXT)
+        self.filter_button.setToolTip(FILTERS_ACTIVITY_TOOLTIP)
+        self.filter_button.setFixedSize(ACTIVITY_BAR_BUTTON_SIZE, ACTIVITY_BAR_BUTTON_SIZE)
+        self.filter_button.setStyleSheet(ACTIVITY_BUTTON_INACTIVE_STYLE)
+        self.filter_button.clicked.connect(self.on_filter_button_clicked)
+        layout.addWidget(self.filter_button)
+        
         # Add stretch to push buttons to the top
         layout.addStretch()
         
@@ -65,6 +75,15 @@ class ActivityBar(QWidget):
             # Activate files button
             self.set_active_button('files')
     
+    def on_filter_button_clicked(self):
+        """Handle filter button click."""
+        if self.active_button == 'filters':
+            # Clicking active button deactivates it
+            self.set_active_button(None)
+        else:
+            # Activate filter button
+            self.set_active_button('filters')
+    
     def set_active_button(self, button_name):
         """Set which button is active and update styles accordingly."""
         # Update internal state
@@ -74,18 +93,27 @@ class ActivityBar(QWidget):
         # Update button styles
         if button_name == 'files':
             self.files_button.setStyleSheet(ACTIVITY_BUTTON_ACTIVE_STYLE)
+            self.filter_button.setStyleSheet(ACTIVITY_BUTTON_INACTIVE_STYLE)
+        elif button_name == 'filters':
+            self.files_button.setStyleSheet(ACTIVITY_BUTTON_INACTIVE_STYLE)
+            self.filter_button.setStyleSheet(ACTIVITY_BUTTON_ACTIVE_STYLE)
         else:  # None - deactivate all
             self.files_button.setStyleSheet(ACTIVITY_BUTTON_INACTIVE_STYLE)
+            self.filter_button.setStyleSheet(ACTIVITY_BUTTON_INACTIVE_STYLE)
         
         # Emit signals for state changes
         if previous_button != button_name:
             # Emit deactivation signal for previous button
             if previous_button == 'files':
                 self.files_button_clicked.emit(False)
+            elif previous_button == 'filters':
+                self.filter_button_clicked.emit(False)
             
             # Emit activation signal for new button
             if button_name == 'files':
                 self.files_button_clicked.emit(True)
+            elif button_name == 'filters':
+                self.filter_button_clicked.emit(True)
     
     def get_active_button(self):
         """Return the name of the currently active button or None."""
