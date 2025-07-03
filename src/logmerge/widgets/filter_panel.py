@@ -131,6 +131,22 @@ class DiscreteFilterWidget(FilterWidget):
                 margin: 0px;
                 border: none;
                 height: 16px;
+                color: black;
+                background-color: transparent;
+            }
+            QListWidget::item:selected {
+                background-color: #e3f2fd;
+                color: black;
+                border: 1px solid #2196f3;
+            }
+            QListWidget::item:hover {
+                background-color: #f5f5f5;
+                color: black;
+            }
+            QListWidget::item:selected:hover {
+                background-color: #bbdefb;
+                color: black;
+                border: 1px solid #1976d2;
             }
         """)
         
@@ -165,11 +181,20 @@ class DiscreteFilterWidget(FilterWidget):
             start_index = min(self.last_clicked_index, current_index)
             end_index = max(self.last_clicked_index, current_index)
             
+            # Clear current selection first
+            self.list_widget.clearSelection()
+            
             # Select range
             for i in range(start_index, end_index + 1):
                 self.list_widget.item(i).setSelected(True)
+        elif modifiers & Qt.ControlModifier:
+            # Ctrl+click adds/removes from selection - Qt handles this automatically
+            pass
+        else:
+            # Single click without modifiers - select only this item
+            self.list_widget.clearSelection()
+            item.setSelected(True)
         
-        # Handle Ctrl+click for individual selection (Qt handles this automatically)
         # Update last clicked index
         self.last_clicked_index = current_index
     
@@ -177,23 +202,22 @@ class DiscreteFilterWidget(FilterWidget):
         """Handle checkbox changes - apply to all selected items if multiple are selected."""
         selected_items = self.list_widget.selectedItems()
         
-        # If multiple items are selected, apply the same check state to all selected items
-        if len(selected_items) > 1 and item in selected_items:
+        # If multiple items are selected, apply checkbox change to all selected items
+        if len(selected_items) > 1:
             new_state = item.checkState()
             
-            # Temporarily disconnect the signal to avoid recursive calls
+            # Temporarily disconnect signal to avoid recursion
             self.list_widget.itemChanged.disconnect(self.on_item_changed)
             
             try:
-                # Apply the same state to all selected items
+                # Apply same state to all selected items except the one that triggered this
                 for selected_item in selected_items:
-                    if selected_item != item:  # Don't change the item that triggered this
+                    if selected_item != item:
                         selected_item.setCheckState(new_state)
             finally:
-                # Reconnect the signal
+                # Reconnect signal
                 self.list_widget.itemChanged.connect(self.on_item_changed)
         
-        # Emit filter changed signal
         self.filter_changed.emit()
     
     def get_filter_value(self):
