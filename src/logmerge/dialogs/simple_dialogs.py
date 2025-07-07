@@ -41,7 +41,7 @@ def select_schema_file(parent=None) -> Optional[str]:
     try:
         from .. import plugins
         start_dir = str(Path(plugins.__file__).parent)
-    except:
+    except (ImportError, AttributeError):
         start_dir = QDir.homePath()
     
     file_path, _ = QFileDialog.getOpenFileName(

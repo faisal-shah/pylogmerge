@@ -9,12 +9,12 @@ Example log format:
 """
 
 import json
+import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Optional, Any
 
 # Import logging from parent package
-import sys
-from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_config import get_logger
 

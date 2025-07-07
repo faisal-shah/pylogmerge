@@ -13,12 +13,11 @@ Chn Identifier Flg   DLC  D0...1...2...3...4...5...6..D7       Time     Dir
 """
 
 import re
-from datetime import datetime, timedelta
+import sys
+from pathlib import Path
 from typing import Dict, Optional, Any
 
 # Import logging from parent package
-import sys
-from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_config import get_logger
 

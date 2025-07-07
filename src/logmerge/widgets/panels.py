@@ -6,7 +6,7 @@ class and specific panel implementations.
 """
 
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget,

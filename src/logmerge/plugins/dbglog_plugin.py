@@ -9,12 +9,9 @@ This plugin demonstrates both regex-based parsing and custom parsing function ap
 The parse_raw_line function takes precedence over the regex pattern when provided.
 """
 
-import re
-from datetime import datetime
-from typing import Dict, Optional, Any
-
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_config import get_logger
 

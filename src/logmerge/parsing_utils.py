@@ -6,8 +6,7 @@ Pure functions for log parsing and field value conversion.
 These functions are extracted from the main application to be reusable and testable.
 """
 
-import re
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
 from .plugin_utils import LogParsingPlugin
 

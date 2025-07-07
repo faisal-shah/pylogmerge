@@ -7,13 +7,11 @@ Dynamically creates appropriate filter widgets for each field in the schema.
 
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, 
-    QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QListWidget,
-    QListWidgetItem, QDateTimeEdit, QScrollArea, QFrame, QApplication,
-    QSizePolicy, QPushButton
+    QLineEdit, QSpinBox, QDoubleSpinBox, QListWidget,
+    QListWidgetItem, QDateTimeEdit, QScrollArea, QSizePolicy, QPushButton
 )
-from PyQt5.QtCore import pyqtSignal, QDateTime, Qt
-from PyQt5.QtGui import QFont, QDoubleValidator
-from datetime import datetime
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtGui import QDoubleValidator
 
 from ..constants import (
     PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, SIDEBAR_CONTENT_MARGINS, 

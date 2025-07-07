@@ -11,12 +11,11 @@ Chn Identifier Flg   DLC  D0...1...2...3...4...5...6..D7       Time     Dir
  0    00002102 X       8  60  00  00  5F  60  60  E2  F2   46055.090598 R
 """
 
-from datetime import datetime
+import sys
+from pathlib import Path
 from typing import Dict, Optional, Any
 
 # Import logging from parent package
-import sys
-from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from logging_config import get_logger
 
@@ -104,5 +103,5 @@ def parse_raw_line(line: str) -> Optional[Dict[str, Any]]:
             'dir': parts[-1]
         }
     except (ValueError, IndexError):
-        logger.debug(f"Malformed line")
+        logger.debug("Malformed line")
         return None  # Skip malformed lines

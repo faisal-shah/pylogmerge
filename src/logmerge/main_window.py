@@ -5,7 +5,6 @@ Contains the main application window class.
 """
 
 import time
-from typing import Optional, List
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QTableView, 
@@ -25,7 +24,7 @@ from .dialogs.simple_dialogs import show_plugin_options_and_select
 from .constants import (
     WINDOW_TITLE, MAIN_WINDOW_DEFAULT_GEOMETRY, FOLLOW_ACTION_TEXT,
     COLUMN_CONFIG_ACTION_TEXT, BUFFER_DRAIN_INTERVAL_MS,
-    READY_STATUS, PANEL_MIN_WIDTH, SCHEMA_LOAD_ERROR_FORMAT,
+    READY_STATUS, SCHEMA_LOAD_ERROR_FORMAT,
     PROCESSING_ENTRIES_FORMAT, BUFFER_DRAINED_FORMAT, BUFFER_EMPTY_MESSAGE,
     NO_SHARED_BUFFER_MESSAGE, FILE_COUNT_STATUS_FORMAT, THREAD_SHUTDOWN_TIMEOUT_MS,
     THREAD_FORCE_TERMINATE_TIMEOUT_MS

@@ -9,8 +9,7 @@ This module handles the plugin system for the merged log viewer application.
 import re
 import importlib.util
 import importlib
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Callable
 
 
 class LogParsingPlugin:

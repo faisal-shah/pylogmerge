@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-from ..constants import TITLE_LABEL_STYLE
 
 
 class ColumnConfigurationDialog(QDialog):

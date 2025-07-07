@@ -9,7 +9,6 @@ from typing import List
 
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QListWidgetItem, QDialogButtonBox
 
-from ..constants import TITLE_LABEL_STYLE
 
 
 class FileDiscoveryResultsDialog(QDialog):
@@ -61,7 +60,7 @@ class FileDiscoveryResultsDialog(QDialog):
             add_button = button_box.addButton("Add All Files", QDialogButtonBox.AcceptRole)
             add_button.setDefault(True)
         
-        cancel_button = button_box.addButton("Cancel", QDialogButtonBox.RejectRole)
+        button_box.addButton("Cancel", QDialogButtonBox.RejectRole)
         
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
