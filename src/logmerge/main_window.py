@@ -20,7 +20,8 @@ from .file_monitoring import LogParsingWorker
 from .widgets import (
     FilePickerPanel, FilterPanel, LogTableModel, FileListItemWidget
 )
-from .dialogs import SchemaSelectionDialog, ColumnConfigurationDialog
+from .dialogs import ColumnConfigurationDialog
+from .dialogs.simple_dialogs import show_plugin_options_and_select
 from .constants import (
     WINDOW_TITLE, MAIN_WINDOW_DEFAULT_GEOMETRY, FOLLOW_ACTION_TEXT, FOLLOW_MODE_TOOLTIP,
     COLUMN_CONFIG_ACTION_TEXT, COLUMN_CONFIG_TOOLTIP, BUFFER_DRAIN_INTERVAL_MS,
@@ -222,14 +223,14 @@ class MergedLogViewer(QMainWindow):
     
     def select_schema(self) -> bool:
         """Show schema selection dialog and load the selected schema."""
-        # Select schema file
-        schema_dialog = SchemaSelectionDialog(self)
-        if schema_dialog.exec_() != QDialog.Accepted or not schema_dialog.selected_schema_path:
+        # Select schema file using simple dialog
+        schema_path = show_plugin_options_and_select(self)
+        if not schema_path:
             return False
             
         try:
             # Load and create plugin from file
-            self.schema = LogParsingPlugin.from_file(schema_dialog.selected_schema_path)
+            self.schema = LogParsingPlugin.from_file(schema_path)
             
             # Set schema for filter panel
             if hasattr(self, 'filter_panel'):

@@ -40,7 +40,6 @@ MAIN_WINDOW_DEFAULT_GEOMETRY = (100, 100, 1200, 800)  # x, y, width, height
 DEFAULT_SPLITTER_SIZES = [300, 900]  # Sidebar width, main view width
 
 # Dialog Dimensions
-SCHEMA_DIALOG_SIZE = (500, 400)
 ADD_FILES_DIALOG_SIZE = (500, 400)
 FILE_DISCOVERY_DIALOG_SIZE = (600, 400)
 COLUMN_CONFIG_DIALOG_SIZE = (600, 500)
@@ -91,7 +90,6 @@ CANCEL_TEXT = "Cancel"
 # DIALOG TITLES
 # ============================================================================
 
-SCHEMA_DIALOG_TITLE = "Select Log Plugin"
 ADD_FILES_DIALOG_TITLE = "Add Log Files"
 FILES_FOUND_DIALOG_TITLE = "Files Found"
 COLUMN_CONFIG_DIALOG_TITLE = "Configure Columns"
@@ -114,7 +112,6 @@ DIRECTORY_REGEX_TAB = "Directory + Regex"
 # PLACEHOLDER TEXTS
 # ============================================================================
 
-SCHEMA_PATH_PLACEHOLDER = "No plugin file selected..."
 DIRECTORY_PLACEHOLDER = "Click 'Browse' to select a directory..."
 REGEX_PLACEHOLDER = "Enter regex pattern (e.g., .*\\.log$)"
 
@@ -205,13 +202,6 @@ INVALID_REGEX_MESSAGE_FORMAT = "✗ Invalid regex: {error}"
 # INSTRUCTIONAL TEXT
 # ============================================================================
 
-SCHEMA_INSTRUCTIONS = """
-<b>Select Log Parsing Plugin</b><br><br>
-Choose from the pre-installed plugins below, or browse for a custom plugin file.
-Each plugin defines how to parse a specific log format.
-"""
-
-PREINSTALLED_PLUGINS_LABEL = "Pre-installed Plugins:"
 FILES_TAB_INSTRUCTIONS = "Select individual log files to add to the viewer."
 DIRECTORY_TAB_INSTRUCTIONS = "Select a directory and specify a regex pattern to match log files."
 
