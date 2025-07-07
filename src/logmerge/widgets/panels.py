@@ -16,11 +16,7 @@ from PyQt5.QtCore import pyqtSignal, Qt
 
 from ..constants import (
     PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, SIDEBAR_CONTENT_MARGINS,
-    LOG_FILES_TITLE, TITLE_LABEL_STYLE, SELECT_ALL_TEXT, DESELECT_ALL_TEXT,
-    ADD_BUTTON_EMOJI, REMOVE_BUTTON_EMOJI, ADD_FILES_TOOLTIP, REMOVE_FILES_TOOLTIP,
-    DUPLICATE_FILE_MESSAGE_SINGLE, DUPLICATE_FILES_MESSAGE_MULTIPLE,
-    DUPLICATE_FILES_DIALOG_TITLE, REMOVE_FILES_DIALOG_TITLE,
-    REMOVE_MULTIPLE_FILES_CONFIRM
+    LOG_FILES_TITLE, TITLE_LABEL_STYLE
 )
 from .file_list import FileListWidget, FileListItemWidget
 
@@ -50,11 +46,11 @@ class FilePickerPanel(QWidget):
         # Select All / Deselect All buttons
         button_layout = QHBoxLayout()
         
-        self.select_all_btn = QPushButton(SELECT_ALL_TEXT)
+        self.select_all_btn = QPushButton("Select All")
         self.select_all_btn.clicked.connect(self.select_all_files)
         button_layout.addWidget(self.select_all_btn)
         
-        self.deselect_all_btn = QPushButton(DESELECT_ALL_TEXT)
+        self.deselect_all_btn = QPushButton("Deselect All")
         self.deselect_all_btn.clicked.connect(self.deselect_all_files)
         button_layout.addWidget(self.deselect_all_btn)
         
@@ -68,13 +64,13 @@ class FilePickerPanel(QWidget):
         # Add/Remove buttons
         control_layout = QHBoxLayout()
         
-        self.add_btn = QPushButton(ADD_BUTTON_EMOJI)
-        self.add_btn.setToolTip(ADD_FILES_TOOLTIP)
+        self.add_btn = QPushButton("➕")
+        self.add_btn.setToolTip("Add log files or directory")
         self.add_btn.clicked.connect(self.add_files)
         control_layout.addWidget(self.add_btn)
         
-        self.remove_btn = QPushButton(REMOVE_BUTTON_EMOJI)
-        self.remove_btn.setToolTip(REMOVE_FILES_TOOLTIP)
+        self.remove_btn = QPushButton("➖")
+        self.remove_btn.setToolTip("Remove selected files")
         self.remove_btn.clicked.connect(self.remove_selected_files)
         control_layout.addWidget(self.remove_btn)
         
@@ -133,11 +129,11 @@ class FilePickerPanel(QWidget):
             # Show message if some files were skipped
             if skipped_files:
                 if len(skipped_files) == 1:
-                    message = DUPLICATE_FILE_MESSAGE_SINGLE.format(file=skipped_files[0])
+                    message = f"File '{skipped_files[0]}' is already in the list."
                 else:
-                    message = DUPLICATE_FILES_MESSAGE_MULTIPLE.format(count=len(skipped_files))
+                    message = f"{len(skipped_files)} files were already in the list and skipped."
                 
-                QMessageBox.information(self, DUPLICATE_FILES_DIALOG_TITLE, message)
+                QMessageBox.information(self, "Duplicate Files", message)
             
             if added_files:
                 self.files_changed.emit()
@@ -151,9 +147,9 @@ class FilePickerPanel(QWidget):
         # Confirm removal if multiple files selected
         if len(selected_items) > 1:
             reply = QMessageBox.question(
-                self, 
-                REMOVE_FILES_DIALOG_TITLE,
-                REMOVE_MULTIPLE_FILES_CONFIRM.format(count=len(selected_items)),
+                self,
+                "Remove Files",
+                f"Remove {len(selected_items)} selected files?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
             )

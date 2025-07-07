@@ -9,10 +9,7 @@ from typing import List
 
 from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QListWidget, QListWidgetItem, QDialogButtonBox
 
-from ..constants import (
-    FILES_FOUND_DIALOG_TITLE, FILE_DISCOVERY_DIALOG_SIZE, FILES_FOUND_SUMMARY_FORMAT,
-    SUMMARY_LABEL_STYLE, FILES_TO_ADD_LABEL, NO_FILES_STYLE, ADD_ALL_FILES_TEXT, CANCEL_TEXT
-)
+from ..constants import TITLE_LABEL_STYLE
 
 
 class FileDiscoveryResultsDialog(QDialog):
@@ -27,22 +24,22 @@ class FileDiscoveryResultsDialog(QDialog):
         
     def setup_ui(self):
         """Set up the dialog UI."""
-        self.setWindowTitle(FILES_FOUND_DIALOG_TITLE)
+        self.setWindowTitle("Files Found")
         self.setModal(True)
-        self.resize(*FILE_DISCOVERY_DIALOG_SIZE)
+        self.resize(600, 400)
         
         layout = QVBoxLayout()
         
         # Summary label
-        summary_text = FILES_FOUND_SUMMARY_FORMAT.format(count=len(self.found_files), pattern=self.regex_pattern, directory=self.directory)
+        summary_text = f"Found {len(self.found_files)} files matching pattern '{self.regex_pattern}' in directory '{self.directory}'"
         summary_label = QLabel(summary_text)
         summary_label.setWordWrap(True)
-        summary_label.setStyleSheet(SUMMARY_LABEL_STYLE)
+        summary_label.setStyleSheet("font-weight: bold; margin-bottom: 10px;")
         layout.addWidget(summary_label)
         
         # File list
         if self.found_files:
-            files_label = QLabel(FILES_TO_ADD_LABEL)
+            files_label = QLabel("Files to be added:")
             layout.addWidget(files_label)
             
             self.file_list = QListWidget()
@@ -55,16 +52,16 @@ class FileDiscoveryResultsDialog(QDialog):
             layout.addWidget(self.file_list)
         else:
             no_files_label = QLabel("No files found matching the specified pattern.")
-            no_files_label.setStyleSheet(NO_FILES_STYLE)
+            no_files_label.setStyleSheet("color: #666; font-style: italic;")
             layout.addWidget(no_files_label)
         
         # Buttons
         button_box = QDialogButtonBox()
         if self.found_files:
-            add_button = button_box.addButton(ADD_ALL_FILES_TEXT, QDialogButtonBox.AcceptRole)
+            add_button = button_box.addButton("Add All Files", QDialogButtonBox.AcceptRole)
             add_button.setDefault(True)
         
-        cancel_button = button_box.addButton(CANCEL_TEXT, QDialogButtonBox.RejectRole)
+        cancel_button = button_box.addButton("Cancel", QDialogButtonBox.RejectRole)
         
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)

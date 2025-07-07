@@ -23,9 +23,9 @@ from .widgets import (
 from .dialogs import ColumnConfigurationDialog
 from .dialogs.simple_dialogs import show_plugin_options_and_select
 from .constants import (
-    WINDOW_TITLE, MAIN_WINDOW_DEFAULT_GEOMETRY, FOLLOW_ACTION_TEXT, FOLLOW_MODE_TOOLTIP,
-    COLUMN_CONFIG_ACTION_TEXT, COLUMN_CONFIG_TOOLTIP, BUFFER_DRAIN_INTERVAL_MS,
-    READY_STATUS, PANEL_MIN_WIDTH, SCHEMA_ERROR_DIALOG_TITLE, SCHEMA_LOAD_ERROR_FORMAT,
+    WINDOW_TITLE, MAIN_WINDOW_DEFAULT_GEOMETRY, FOLLOW_ACTION_TEXT,
+    COLUMN_CONFIG_ACTION_TEXT, BUFFER_DRAIN_INTERVAL_MS,
+    READY_STATUS, PANEL_MIN_WIDTH, SCHEMA_LOAD_ERROR_FORMAT,
     PROCESSING_ENTRIES_FORMAT, BUFFER_DRAINED_FORMAT, BUFFER_EMPTY_MESSAGE,
     NO_SHARED_BUFFER_MESSAGE, FILE_COUNT_STATUS_FORMAT, THREAD_SHUTDOWN_TIMEOUT_MS,
     THREAD_FORCE_TERMINATE_TIMEOUT_MS
@@ -179,7 +179,7 @@ class MergedLogViewer(QMainWindow):
         self.follow_action = QAction(FOLLOW_ACTION_TEXT, self)
         self.follow_action.setCheckable(True)
         self.follow_action.setChecked(self.follow_mode)
-        self.follow_action.setToolTip(FOLLOW_MODE_TOOLTIP)
+        self.follow_action.setToolTip("Automatically scroll to show latest log entries")
         self.follow_action.triggered.connect(self.toggle_follow_mode)
         toolbar.addAction(self.follow_action)
         
@@ -187,7 +187,7 @@ class MergedLogViewer(QMainWindow):
         
         # Column configuration action
         self.column_config_action = QAction(COLUMN_CONFIG_ACTION_TEXT, self)
-        self.column_config_action.setToolTip(COLUMN_CONFIG_TOOLTIP)
+        self.column_config_action.setToolTip("Configure which columns to display and their order")
         self.column_config_action.triggered.connect(self.open_column_configuration)
         toolbar.addAction(self.column_config_action)
     
@@ -244,7 +244,7 @@ class MergedLogViewer(QMainWindow):
         except Exception as e:
             QMessageBox.critical(
                 self, 
-                SCHEMA_ERROR_DIALOG_TITLE, 
+                "Schema Error", 
                 SCHEMA_LOAD_ERROR_FORMAT.format(error=str(e))
             )
             return False

@@ -12,14 +12,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-from ..constants import (
-    COLUMN_CONFIG_DIALOG_TITLE, COLUMN_CONFIG_DIALOG_SIZE, COLUMN_CONFIG_INSTRUCTIONS,
-    AVAILABLE_COLUMNS_LABEL, ADD_SELECTED_TEXT, ADD_COLUMNS_TOOLTIP, ADD_ALL_TEXT,
-    ADD_ALL_COLUMNS_TOOLTIP, REMOVE_SELECTED_TEXT, REMOVE_COLUMNS_TOOLTIP,
-    REMOVE_ALL_TEXT, REMOVE_ALL_COLUMNS_TOOLTIP, VISIBLE_COLUMNS_LABEL,
-    MOVE_UP_TEXT, MOVE_UP_TOOLTIP, MOVE_DOWN_TEXT, MOVE_DOWN_TOOLTIP,
-    VIRTUAL_COLUMN_SUFFIX
-)
+from ..constants import TITLE_LABEL_STYLE
 
 
 class ColumnConfigurationDialog(QDialog):
@@ -41,14 +34,18 @@ class ColumnConfigurationDialog(QDialog):
         
     def setup_ui(self):
         """Set up the dialog UI with dual-list selection pattern."""
-        self.setWindowTitle(COLUMN_CONFIG_DIALOG_TITLE)
+        self.setWindowTitle("Configure Columns")
         self.setModal(True)
-        self.resize(*COLUMN_CONFIG_DIALOG_SIZE)
+        self.resize(600, 500)
         
         layout = QVBoxLayout()
         
         # Instructions
-        instructions = QLabel(COLUMN_CONFIG_INSTRUCTIONS)
+        instructions = QLabel("""
+<b>Configure Visible Columns</b><br><br>
+Select which columns to display in the log table and arrange their order.
+Use the buttons to move columns between available and visible lists.
+""")
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
         
@@ -57,7 +54,7 @@ class ColumnConfigurationDialog(QDialog):
         
         # Available columns (left side)
         left_layout = QVBoxLayout()
-        left_layout.addWidget(QLabel(AVAILABLE_COLUMNS_LABEL))
+        left_layout.addWidget(QLabel("Available Columns:"))
         self.available_list = QListWidget()
         self.available_list.setSelectionMode(QListWidget.ExtendedSelection)
         self.available_list.itemDoubleClicked.connect(self.add_selected_columns)
@@ -67,25 +64,25 @@ class ColumnConfigurationDialog(QDialog):
         button_layout = QVBoxLayout()
         button_layout.addStretch()
         
-        self.add_button = QPushButton(ADD_SELECTED_TEXT)
-        self.add_button.setToolTip(ADD_COLUMNS_TOOLTIP)
+        self.add_button = QPushButton("Add >")
+        self.add_button.setToolTip("Add selected columns to visible list")
         self.add_button.clicked.connect(self.add_selected_columns)
         button_layout.addWidget(self.add_button)
         
-        self.add_all_button = QPushButton(ADD_ALL_TEXT)
-        self.add_all_button.setToolTip(ADD_ALL_COLUMNS_TOOLTIP)
+        self.add_all_button = QPushButton("Add All >>")
+        self.add_all_button.setToolTip("Add all available columns to visible list")
         self.add_all_button.clicked.connect(self.add_all_columns)
         button_layout.addWidget(self.add_all_button)
         
         button_layout.addSpacing(20)
         
-        self.remove_button = QPushButton(REMOVE_SELECTED_TEXT)
-        self.remove_button.setToolTip(REMOVE_COLUMNS_TOOLTIP)
+        self.remove_button = QPushButton("< Remove")
+        self.remove_button.setToolTip("Remove selected columns from visible list")
         self.remove_button.clicked.connect(self.remove_selected_columns)
         button_layout.addWidget(self.remove_button)
         
-        self.remove_all_button = QPushButton(REMOVE_ALL_TEXT)
-        self.remove_all_button.setToolTip(REMOVE_ALL_COLUMNS_TOOLTIP)
+        self.remove_all_button = QPushButton("<< Remove")
+        self.remove_all_button.setToolTip("Remove all columns from visible list")
         self.remove_all_button.clicked.connect(self.remove_all_columns)
         button_layout.addWidget(self.remove_all_button)
         
@@ -93,7 +90,7 @@ class ColumnConfigurationDialog(QDialog):
         
         # Visible columns (right side)
         right_layout = QVBoxLayout()
-        right_layout.addWidget(QLabel(VISIBLE_COLUMNS_LABEL))
+        right_layout.addWidget(QLabel("Visible Columns (in display order):"))
         self.visible_list = QListWidget()
         self.visible_list.setSelectionMode(QListWidget.ExtendedSelection)
         self.visible_list.itemDoubleClicked.connect(self.remove_selected_columns)
@@ -102,13 +99,13 @@ class ColumnConfigurationDialog(QDialog):
         # Ordering buttons for visible list
         order_layout = QHBoxLayout()
         
-        self.move_up_button = QPushButton(MOVE_UP_TEXT)
-        self.move_up_button.setToolTip(MOVE_UP_TOOLTIP)
+        self.move_up_button = QPushButton("Move Up")
+        self.move_up_button.setToolTip("Move selected columns up in display order")
         self.move_up_button.clicked.connect(self.move_columns_up)
         order_layout.addWidget(self.move_up_button)
         
-        self.move_down_button = QPushButton(MOVE_DOWN_TEXT)
-        self.move_down_button.setToolTip(MOVE_DOWN_TOOLTIP)
+        self.move_down_button = QPushButton("Move Down")
+        self.move_down_button.setToolTip("Move selected columns down in display order")
         self.move_down_button.clicked.connect(self.move_columns_down)
         order_layout.addWidget(self.move_down_button)
         
@@ -152,7 +149,7 @@ class ColumnConfigurationDialog(QDialog):
         for column_name in self.available_columns:
             if column_name == self.LogTableModel.SOURCE_FILE_COLUMN:
                 # Handle virtual column
-                display_text = f"{column_name}{VIRTUAL_COLUMN_SUFFIX}"
+                display_text = f"{column_name} (virtual)"
                 item = QListWidgetItem(display_text)
                 item.setData(Qt.UserRole, column_name)
                 item.setToolTip("Virtual column showing the source filename")
@@ -171,7 +168,7 @@ class ColumnConfigurationDialog(QDialog):
         for column_name in self.visible_columns:
             if column_name == self.LogTableModel.SOURCE_FILE_COLUMN:
                 # Handle virtual column
-                display_text = f"{column_name}{VIRTUAL_COLUMN_SUFFIX}"
+                display_text = f"{column_name} (virtual)"
                 item = QListWidgetItem(display_text)
                 item.setData(Qt.UserRole, column_name)
                 item.setToolTip("Virtual column showing the source filename")

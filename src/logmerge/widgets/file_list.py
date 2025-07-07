@@ -11,7 +11,7 @@ from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QColor
 
 from ..constants import (
-    DEFAULT_FILE_COLORS, FILE_ITEM_CONTENT_MARGINS, DEFAULT_CHECKBOX_CHECKED,
+    DEFAULT_FILE_COLORS, FILE_ITEM_CONTENT_MARGINS,
     COLOR_INDICATOR_SIZE, COLOR_INDICATOR_STYLE_TEMPLATE
 )
 
@@ -65,7 +65,7 @@ class FileListItemWidget(QWidget):
         
         # Checkbox for enabling/disabling the file
         self.checkbox = QCheckBox()
-        self.checkbox.setChecked(DEFAULT_CHECKBOX_CHECKED)  # Default to checked
+        self.checkbox.setChecked(True)  # Default to checked
         self.checkbox.stateChanged.connect(self.checkbox_changed.emit)
         layout.addWidget(self.checkbox)
         

@@ -16,17 +16,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 
 from .file_discovery import FileDiscoveryResultsDialog
-from ..constants import (
-    ADD_FILES_DIALOG_TITLE, ADD_FILES_DIALOG_SIZE, SELECT_FILES_TAB, DIRECTORY_REGEX_TAB,
-    FILES_TAB_INSTRUCTIONS, BROWSE_FILES_TEXT, CLEAR_BUTTON_TEXT, DIRECTORY_TAB_INSTRUCTIONS,
-    DIRECTORY_LABEL, DIRECTORY_PLACEHOLDER, BROWSE_BUTTON_TEXT, REGEX_PATTERN_LABEL,
-    DEFAULT_REGEX_PATTERN, REGEX_PLACEHOLDER, DEFAULT_RECURSIVE_SEARCH, PREVIEW_FILES_TEXT,
-    REGEX_EXAMPLES_HTML, INFO_LABEL_STYLE, LOG_FILE_FILTER, ENTER_REGEX_MESSAGE,
-    REGEX_WARNING_STYLE, VALID_REGEX_MESSAGE, REGEX_VALID_STYLE, INVALID_REGEX_MESSAGE_FORMAT,
-    REGEX_ERROR_STYLE, REGEX_INPUT_ERROR_STYLE, SEARCH_ERROR_DIALOG_TITLE, SEARCH_ERROR_MESSAGE_FORMAT,
-    NO_DIRECTORY_DIALOG_TITLE, NO_DIRECTORY_MESSAGE, INVALID_REGEX_DIALOG_TITLE,
-    INVALID_REGEX_MESSAGE, NO_FILES_FOUND_DIALOG_TITLE, NO_FILES_FOUND_MESSAGE
-)
+from ..constants import TITLE_LABEL_STYLE
 
 
 class AddFilesDialog(QDialog):
@@ -39,9 +29,9 @@ class AddFilesDialog(QDialog):
         
     def setup_ui(self):
         """Set up the tabbed dialog UI."""
-        self.setWindowTitle(ADD_FILES_DIALOG_TITLE)
+        self.setWindowTitle("Add Log Files")
         self.setModal(True)
-        self.resize(*ADD_FILES_DIALOG_SIZE)
+        self.resize(500, 400)
         
         layout = QVBoxLayout()
         
@@ -50,11 +40,11 @@ class AddFilesDialog(QDialog):
         
         # Tab 1: Select Files
         self.files_tab = self.create_files_tab()
-        self.tab_widget.addTab(self.files_tab, SELECT_FILES_TAB)
+        self.tab_widget.addTab(self.files_tab, "Select Files")
         
         # Tab 2: Directory + Regex
         self.directory_tab = self.create_directory_tab()
-        self.tab_widget.addTab(self.directory_tab, DIRECTORY_REGEX_TAB)
+        self.tab_widget.addTab(self.directory_tab, "Directory + Regex")
         
         layout.addWidget(self.tab_widget)
         
@@ -72,7 +62,7 @@ class AddFilesDialog(QDialog):
         layout = QVBoxLayout()
         
         # Instructions
-        instructions = QLabel(FILES_TAB_INSTRUCTIONS)
+        instructions = QLabel("Select individual log files to add to the viewer.")
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
         
@@ -83,11 +73,11 @@ class AddFilesDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
-        self.browse_files_btn = QPushButton(BROWSE_FILES_TEXT)
+        self.browse_files_btn = QPushButton("Browse Files...")
         self.browse_files_btn.clicked.connect(self.browse_individual_files)
         button_layout.addWidget(self.browse_files_btn)
         
-        self.clear_files_btn = QPushButton(CLEAR_BUTTON_TEXT)
+        self.clear_files_btn = QPushButton("Clear")
         self.clear_files_btn.clicked.connect(self.clear_selected_files)
         button_layout.addWidget(self.clear_files_btn)
         
@@ -103,29 +93,29 @@ class AddFilesDialog(QDialog):
         layout = QVBoxLayout()
         
         # Instructions
-        instructions = QLabel(DIRECTORY_TAB_INSTRUCTIONS)
+        instructions = QLabel("Select a directory and specify a regex pattern to match log files.")
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
         
         # Directory selection
         dir_layout = QHBoxLayout()
-        dir_layout.addWidget(QLabel(DIRECTORY_LABEL))
+        dir_layout.addWidget(QLabel("Directory:"))
         self.directory_edit = QLineEdit()
         self.directory_edit.setReadOnly(True)
-        self.directory_edit.setPlaceholderText(DIRECTORY_PLACEHOLDER)
+        self.directory_edit.setPlaceholderText("Click 'Browse' to select a directory...")
         dir_layout.addWidget(self.directory_edit)
         
-        self.browse_dir_btn = QPushButton(BROWSE_BUTTON_TEXT)
+        self.browse_dir_btn = QPushButton("Browse...")
         self.browse_dir_btn.clicked.connect(self.browse_directory)
         dir_layout.addWidget(self.browse_dir_btn)
         layout.addLayout(dir_layout)
         
         # Regex pattern
         regex_layout = QHBoxLayout()
-        regex_layout.addWidget(QLabel(REGEX_PATTERN_LABEL))
+        regex_layout.addWidget(QLabel("Regex Pattern:"))
         self.regex_edit = QLineEdit()
-        self.regex_edit.setText(DEFAULT_REGEX_PATTERN)  # Default pattern
-        self.regex_edit.setPlaceholderText(REGEX_PLACEHOLDER)
+        self.regex_edit.setText(".*\\.log$")  # Default pattern
+        self.regex_edit.setPlaceholderText("Enter regex pattern (e.g., .*\\.log$)")
         self.regex_edit.textChanged.connect(self.validate_regex)
         regex_layout.addWidget(self.regex_edit)
         layout.addLayout(regex_layout)
@@ -137,19 +127,25 @@ class AddFilesDialog(QDialog):
         
         # Recursive option
         self.recursive_checkbox = QCheckBox("Search subdirectories recursively")
-        self.recursive_checkbox.setChecked(DEFAULT_RECURSIVE_SEARCH)  # Default to recursive
+        self.recursive_checkbox.setChecked(True)  # Default to recursive
         layout.addWidget(self.recursive_checkbox)
         
         # Preview button
-        self.preview_btn = QPushButton(PREVIEW_FILES_TEXT)
+        self.preview_btn = QPushButton("Preview Matching Files...")
         self.preview_btn.clicked.connect(self.preview_directory_files)
         self.preview_btn.setEnabled(False)  # Enabled when directory is selected
         layout.addWidget(self.preview_btn)
         
         # Examples
-        examples_label = QLabel(REGEX_EXAMPLES_HTML)
+        examples_label = QLabel("""
+<b>Regex Examples:</b><br>
+• <code>.*\\.log$</code> - All .log files<br>
+• <code>.*/error.*\\.log$</code> - Log files containing 'error' in any subdirectory<br>
+• <code>^daily/.*</code> - Files only in 'daily' directory<br>
+• <code>.*\\.(log|txt)$</code> - All .log and .txt files
+""")
         examples_label.setWordWrap(True)
-        examples_label.setStyleSheet(INFO_LABEL_STYLE)
+        examples_label.setStyleSheet("color: #666; font-size: 10px; margin-top: 10px;")
         layout.addWidget(examples_label)
         
         layout.addStretch()
@@ -160,7 +156,7 @@ class AddFilesDialog(QDialog):
         """Browse for individual files."""
         file_dialog = QFileDialog()
         file_dialog.setFileMode(QFileDialog.ExistingFiles)
-        file_dialog.setNameFilter(LOG_FILE_FILTER)
+        file_dialog.setNameFilter("Log files (*.log *.txt);;All files (*)")
         file_dialog.setViewMode(QFileDialog.Detail)
         
         if file_dialog.exec_() == QFileDialog.Accepted:
@@ -190,21 +186,21 @@ class AddFilesDialog(QDialog):
         """Validate the regex pattern and update status."""
         pattern = self.regex_edit.text().strip()
         if not pattern:
-            self.regex_status_label.setText(ENTER_REGEX_MESSAGE)
-            self.regex_status_label.setStyleSheet(REGEX_WARNING_STYLE)
+            self.regex_status_label.setText("Enter a regex pattern")
+            self.regex_status_label.setStyleSheet("color: orange;")
             self.regex_edit.setStyleSheet("")
             return False
             
         try:
             re.compile(pattern, re.IGNORECASE)
-            self.regex_status_label.setText(VALID_REGEX_MESSAGE)
-            self.regex_status_label.setStyleSheet(REGEX_VALID_STYLE)
+            self.regex_status_label.setText("✓ Valid regex pattern")
+            self.regex_status_label.setStyleSheet("color: green;")
             self.regex_edit.setStyleSheet("")
             return True
         except re.error as e:
-            self.regex_status_label.setText(INVALID_REGEX_MESSAGE_FORMAT.format(error=str(e)))
-            self.regex_status_label.setStyleSheet(REGEX_ERROR_STYLE)
-            self.regex_edit.setStyleSheet(REGEX_INPUT_ERROR_STYLE)
+            self.regex_status_label.setText(f"✗ Invalid regex: {str(e)}")
+            self.regex_status_label.setStyleSheet("color: red;")
+            self.regex_edit.setStyleSheet("border: 1px solid red;")
             return False
             
     def find_matching_files(self, directory: str, pattern: str, recursive: bool) -> List[str]:
@@ -232,7 +228,7 @@ class AddFilesDialog(QDialog):
                             
             return sorted(matching_files)
         except Exception as e:
-            QMessageBox.warning(self, SEARCH_ERROR_DIALOG_TITLE, SEARCH_ERROR_MESSAGE_FORMAT.format(error=str(e)))
+            QMessageBox.warning(self, "Search Error", "Error searching for files: {error}".format(error=str(e)))
             return []
             
     def preview_directory_files(self):
@@ -242,11 +238,11 @@ class AddFilesDialog(QDialog):
         recursive = self.recursive_checkbox.isChecked()
         
         if not directory:
-            QMessageBox.warning(self, NO_DIRECTORY_DIALOG_TITLE, NO_DIRECTORY_MESSAGE)
+            QMessageBox.warning(self, "No Directory", "Please select a directory first.")
             return
             
         if not self.validate_regex():
-            QMessageBox.warning(self, INVALID_REGEX_DIALOG_TITLE, INVALID_REGEX_MESSAGE)
+            QMessageBox.warning(self, "Invalid Regex", "Please enter a valid regex pattern.")
             return
             
         # Find matching files
@@ -278,19 +274,19 @@ class AddFilesDialog(QDialog):
             recursive = self.recursive_checkbox.isChecked()
             
             if not directory:
-                QMessageBox.warning(self, NO_DIRECTORY_DIALOG_TITLE, NO_DIRECTORY_MESSAGE)
+                QMessageBox.warning(self, "No Directory", "Please select a directory first.")
                 return
                 
             if not self.validate_regex():
-                QMessageBox.warning(self, INVALID_REGEX_DIALOG_TITLE, INVALID_REGEX_MESSAGE)
+                QMessageBox.warning(self, "Invalid Regex", "Please enter a valid regex pattern.")
                 return
                 
             # Find matching files
             matching_files = self.find_matching_files(directory, pattern, recursive)
             
             if not matching_files:
-                QMessageBox.information(self, NO_FILES_FOUND_DIALOG_TITLE, 
-                                      NO_FILES_FOUND_MESSAGE)
+                QMessageBox.information(self, "No Files Found", 
+                                      "No files found matching the specified pattern.")
                 return
                 
             # Show results and get confirmation
