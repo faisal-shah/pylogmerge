@@ -19,7 +19,6 @@ from ..constants import (
     PANEL_MIN_WIDTH, PANEL_MAX_WIDTH, SIDEBAR_CONTENT_MARGINS, 
     TITLE_LABEL_STYLE, FILTERS_TITLE
 )
-from .panels import BasePanel
 
 
 class FilterWidget(QWidget):
@@ -389,15 +388,16 @@ class FloatTimestampRangeFilterWidget(FilterWidget):
         return result if result else None
 
 
-class FilterPanel(BasePanel):
+class FilterPanel(QWidget):
     """Panel containing all field filters based on schema."""
     
     apply_clicked = pyqtSignal()
     
     def __init__(self, parent=None):
-        super().__init__("filters", parent)
+        super().__init__(parent)
         self.schema = None
         self.filter_widgets = []
+        self.setup_ui()
     
     def setup_ui(self):
         """Set up the filter panel UI."""

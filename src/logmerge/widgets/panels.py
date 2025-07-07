@@ -25,30 +25,14 @@ from ..constants import (
 from .file_list import FileListWidget, FileListItemWidget
 
 
-class BasePanel(QWidget):
-    """Abstract base class for activity bar panels."""
-    
-    def __init__(self, panel_name: str, parent=None):
-        super().__init__(parent)
-        self.panel_name = panel_name
-        self.setup_ui()
-    
-    def setup_ui(self):
-        """Set up the panel UI - to be implemented by subclasses."""
-        raise NotImplementedError("Subclasses must implement setup_ui()")
-    
-    def get_panel_name(self) -> str:
-        """Return the panel name."""
-        return self.panel_name
-
-
-class FilePickerPanel(BasePanel):
+class FilePickerPanel(QWidget):
     """Panel for file picker functionality - contains all file management controls."""
     
     files_changed = pyqtSignal()  # Signal emitted when file list changes
     
     def __init__(self, parent=None):
-        super().__init__("files", parent)
+        super().__init__(parent)
+        self.setup_ui()
     
     def setup_ui(self):
         """Set up the file picker panel UI."""
