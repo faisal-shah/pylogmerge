@@ -9,7 +9,7 @@ from typing import Optional, List
 
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QTableView, 
-    QHeaderView, QAction, QApplication, QDialog, QMessageBox
+    QHeaderView, QAction, QApplication, QDialog, QMessageBox, QTabWidget
 )
 from PyQt5.QtCore import Qt, QTimer, QEvent
 
@@ -18,7 +18,7 @@ from .plugin_utils import LogParsingPlugin
 from .data_structures import SharedLogBuffer
 from .file_monitoring import LogParsingWorker
 from .widgets import (
-    ActivityBar, PanelContainer, FilePickerPanel, FilterPanel, LogTableModel, FileListItemWidget
+    FilePickerPanel, FilterPanel, LogTableModel, FileListItemWidget
 )
 from .dialogs import SchemaSelectionDialog, ColumnConfigurationDialog
 from .constants import (
@@ -69,7 +69,7 @@ class MergedLogViewer(QMainWindow):
     
     def _setup_main_layout(self):
         """Set up the main window layout with panels and table view."""
-        # Create central widget with horizontal layout
+        # Create central widget with horizontal splitter
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
@@ -77,32 +77,33 @@ class MergedLogViewer(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         
-        # Activity Bar (permanent left sidebar)
-        self.activity_bar = ActivityBar()
-        self.activity_bar.files_button_clicked.connect(self.on_files_activity_toggled)
-        self.activity_bar.filter_button_clicked.connect(self.on_filters_activity_toggled)
-        layout.addWidget(self.activity_bar)
-        
-        # Create main splitter and panels
-        self._setup_panels_and_splitter()
-        layout.addWidget(self.main_splitter, 1)
-        
-        central_widget.setLayout(layout)
-    
-    def _setup_panels_and_splitter(self):
-        """Set up the splitter with panels and main table view."""
-        # Create a horizontal splitter to divide panels and main content
+        # Create main splitter
         self.main_splitter = QSplitter(Qt.Horizontal)
         
-        # Panel Container (toggleable panels between activity bar and main content)
-        self.panel_container = PanelContainer()
+        # Create sidebar with tabs (replaces ActivityBar + PanelContainer)
+        self._setup_sidebar()
         
-        # Create and add panels
+        # Create main table view area
+        self._setup_table_view()
+        
+        # Add to main layout
+        layout.addWidget(self.main_splitter, 1)
+        central_widget.setLayout(layout)
+    
+    def _setup_sidebar(self):
+        """Set up the sidebar with tabs containing panels."""
+        # Create sidebar with tabs
+        self.sidebar = QTabWidget()
+        self.sidebar.setTabPosition(QTabWidget.West)
+        self.sidebar.setFixedWidth(350)
+        
+        # Create and add panels as tabs
         self.file_picker_panel = FilePickerPanel()
-        self.panel_container.add_panel(self.file_picker_panel)
-        
         self.filter_panel = FilterPanel()
-        self.panel_container.add_panel(self.filter_panel)
+        
+        # Add panels as tabs with emoji icons
+        self.sidebar.addTab(self.file_picker_panel, "📁")
+        self.sidebar.addTab(self.filter_panel, "🔍")
         
         # Set schema for filter panel if available
         if self.schema:
@@ -114,19 +115,15 @@ class MergedLogViewer(QMainWindow):
         else:
             print("DEBUG: No schema available to set on filter panel")
         
-        # Connect file picker panel signal
+        # Connect panel signals
         self.file_picker_panel.files_changed.connect(self.on_files_changed)
-        
-        # Connect filter panel signal
         self.filter_panel.apply_clicked.connect(self.on_filters_applied)
         
-        self.main_splitter.addWidget(self.panel_container)
+        # Add sidebar to splitter
+        self.main_splitter.addWidget(self.sidebar)
         
-        # Create main table view area
-        self._setup_table_view()
-        
-        # Set initial splitter sizes to hide the panel initially
-        self.main_splitter.setSizes([0, 1])
+        # Set initial splitter sizes
+        self.main_splitter.setSizes([350, 650])
     
     def _setup_table_view(self):
         """Set up the main log table view."""
@@ -345,41 +342,7 @@ class MergedLogViewer(QMainWindow):
         
         if file_colors:
             self.log_table_model.update_file_colors(file_colors)
-        
-    def on_files_activity_toggled(self, is_active: bool) -> None:
-        """Handle files activity bar button toggle."""
-        if is_active:
-            self.panel_container.show_panel('files')
-            
-            current_sizes = self.main_splitter.sizes()
-            self.main_splitter.setSizes([PANEL_MIN_WIDTH, current_sizes[0] + current_sizes[1] - PANEL_MIN_WIDTH])
-            
-            self.logger.debug("Files panel shown")
-        else:
-            self.panel_container.hide_panel()
-            
-            current_sizes = self.main_splitter.sizes()
-            self.main_splitter.setSizes([0, current_sizes[0] + current_sizes[1]])
-            
-            self.logger.debug("Files panel hidden")
-    
-    def on_filters_activity_toggled(self, is_active: bool) -> None:
-        """Handle filters activity bar button toggle."""
-        if is_active:
-            self.panel_container.show_panel('filters')
-            
-            current_sizes = self.main_splitter.sizes()
-            self.main_splitter.setSizes([PANEL_MIN_WIDTH, current_sizes[0] + current_sizes[1] - PANEL_MIN_WIDTH])
-            
-            self.logger.debug("Filters panel shown")
-        else:
-            self.panel_container.hide_panel()
-            
-            current_sizes = self.main_splitter.sizes()
-            self.main_splitter.setSizes([0, current_sizes[0] + current_sizes[1]])
-            
-            self.logger.debug("Filters panel hidden")
-    
+
     def open_column_configuration(self) -> None:
         """Open the column configuration dialog."""
         current_config = self.log_table_model.get_column_configuration()

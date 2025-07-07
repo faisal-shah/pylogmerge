@@ -51,11 +51,6 @@ FILE_ITEM_CONTENT_MARGINS = (5, 2, 5, 2)
 ZERO_CONTENT_MARGINS = (0, 0, 0, 0)
 COLOR_INDICATOR_SIZE = (16, 16)
 
-# Activity Bar Constants
-ACTIVITY_BAR_WIDTH = 50  # Width of the permanent left activity bar
-ACTIVITY_BAR_BUTTON_SIZE = 40  # Size of activity bar icon buttons
-ACTIVITY_BAR_SPACING = 5  # Spacing between buttons
-
 # Panel Constants
 PANEL_MIN_WIDTH = 250  # Minimum width for panels
 PANEL_MAX_WIDTH = 400  # Maximum width for panels
@@ -74,12 +69,6 @@ ADD_BUTTON_EMOJI = "➕"
 REMOVE_BUTTON_EMOJI = "➖"
 FOLLOW_ACTION_TEXT = "▼ Follow"
 COLUMN_CONFIG_ACTION_TEXT = "⚙ Configure Columns"
-
-# Activity Bar Button Text and Tooltips
-FILES_ACTIVITY_BUTTON_TEXT = "📁"
-FILES_ACTIVITY_TOOLTIP = "Show/hide file picker panel"
-FILTERS_ACTIVITY_BUTTON_TEXT = "🔍"
-FILTERS_ACTIVITY_TOOLTIP = "Show/hide filter panel"
 
 # ============================================================================
 # BUTTON LABELS
@@ -267,34 +256,6 @@ REGEX_WARNING_STYLE = "color: orange;"
 REGEX_ERROR_STYLE = "color: red;"
 REGEX_INPUT_ERROR_STYLE = "border: 1px solid red;"
 REGEX_INPUT_NORMAL_STYLE = ""
-
-# Activity Bar Button States
-ACTIVITY_BUTTON_INACTIVE_STYLE = """
-QPushButton {
-    background-color: transparent;
-    border: none;
-    font-size: 20px;
-    padding: 8px;
-    border-radius: 4px;
-}
-QPushButton:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-"""
-
-ACTIVITY_BUTTON_ACTIVE_STYLE = """
-QPushButton {
-    background-color: rgba(255, 255, 255, 0.2);
-    border: none;
-    font-size: 20px;
-    padding: 8px;
-    border-radius: 4px;
-    border-left: 3px solid #0078d4;
-}
-QPushButton:hover {
-    background-color: rgba(255, 255, 255, 0.25);
-}
-"""
 
 # ============================================================================
 # FIELD LABELS
