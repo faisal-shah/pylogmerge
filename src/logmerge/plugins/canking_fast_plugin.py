@@ -24,32 +24,13 @@ logger = get_logger(__name__)
 
 # Schema definition for CAN King log format
 SCHEMA = {
-    "timestamp_field": "timestamp", 
+    "timestamp_field": "timestamp",
     "fields": [
-        {
-            "name": "chn",
-            "type": "int"
-        },
-        {
-            "name": "identifier",
-            "type": "string",
-            "is_discrete": True
-        },
-        {
-            "name": "flg",
-            "type": "string",
-            "is_discrete": True
-        },
-        {
-            "name": "dlc",
-            "type": "int",
-            "is_discrete": True
-        },
-        {
-            "name": "data",
-            "type": "string",
-            "is_discrete": False
-        },
+        {"name": "chn", "type": "int"},
+        {"name": "identifier", "type": "string", "is_discrete": True},
+        {"name": "flg", "type": "string", "is_discrete": True},
+        {"name": "dlc", "type": "int", "is_discrete": True},
+        {"name": "data", "type": "string", "is_discrete": False},
         {
             "name": "timestamp",
             "type": "float_timestamp",
@@ -59,16 +40,17 @@ SCHEMA = {
             "type": "enum",
             "enum_values": [
                 {"value": "T", "name": "TRANSMIT"},
-                {"value": "R", "name": "RECEIVE"}
-            ]
-        }
-    ]
+                {"value": "R", "name": "RECEIVE"},
+            ],
+        },
+    ],
 }
+
 
 def parse_raw_line(line: str) -> Optional[Dict[str, Any]]:
     """Fastest parser with header/error handling."""
 
-    if line.endswith('\n'):
+    if line.endswith("\n"):
         line = line[:-1]
 
     parts = line.split()
@@ -91,16 +73,16 @@ def parse_raw_line(line: str) -> Optional[Dict[str, Any]]:
         dlc = int(parts[2 + field_offset])
         data_start = 3 + field_offset
         data_end = data_start + dlc
-        data_string = ' '.join(parts[data_start:data_end])
+        data_string = " ".join(parts[data_start:data_end])
 
         return {
-            'chn': chn,
-            'identifier': identifier,
-            'flg': flg,
-            'dlc': dlc,
-            'data': data_string,
-            'timestamp': float(parts[-2]),
-            'dir': parts[-1]
+            "chn": chn,
+            "identifier": identifier,
+            "flg": flg,
+            "dlc": dlc,
+            "data": data_string,
+            "timestamp": float(parts[-2]),
+            "dir": parts[-1],
         }
     except (ValueError, IndexError):
         logger.debug("Malformed line")

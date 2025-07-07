@@ -35,22 +35,11 @@ SCHEMA = {
                 {"value": "4", "name": "WARNING"},
                 {"value": "5", "name": "NOTICE"},
                 {"value": "6", "name": "INFO"},
-                {"value": "7", "name": "DEBUG"}
-            ]
+                {"value": "7", "name": "DEBUG"},
+            ],
         },
-        {
-            "name": "timestamp",
-            "type": "epoch"
-        },
-        {
-            "name": "module",
-            "type": "string",
-            "is_discrete": True
-        },
-        {
-            "name": "message",
-            "type": "string",
-            "is_discrete": False
-        }
-    ]
+        {"name": "timestamp", "type": "epoch"},
+        {"name": "module", "type": "string", "is_discrete": True},
+        {"name": "message", "type": "string", "is_discrete": False},
+    ],
 }

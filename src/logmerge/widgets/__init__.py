@@ -10,9 +10,9 @@ from .log_table import LogTableModel
 from .file_list import FileListWidget, FileListItemWidget
 
 __all__ = [
-    'FilePickerPanel',
-    'FilterPanel',
-    'LogTableModel',
-    'FileListWidget',
-    'FileListItemWidget'
+    "FilePickerPanel",
+    "FilterPanel",
+    "LogTableModel",
+    "FileListWidget",
+    "FileListItemWidget",
 ]

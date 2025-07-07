@@ -18,13 +18,17 @@ from .main_window import MergedLogViewer
 def main():
     """Main entry point for the application."""
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Merged Log Viewer - A GUI for viewing and analyzing log files")
-    parser.add_argument('--debug', action='store_true', help='Enable debug logging')
-    parser.add_argument('--log-file', type=str, help='Log to specified file instead of console')
+    parser = argparse.ArgumentParser(
+        description="Merged Log Viewer - A GUI for viewing and analyzing log files"
+    )
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    parser.add_argument(
+        "--log-file", type=str, help="Log to specified file instead of console"
+    )
     args = parser.parse_args()
 
     # Setup logging
-    log_level = 'DEBUG' if args.debug else 'INFO'
+    log_level = "DEBUG" if args.debug else "INFO"
     setup_logging(log_level=log_level)
 
     logger = get_logger(__name__)
@@ -47,7 +51,9 @@ def main():
 
     except Exception as e:
         logger.error(f"Failed to start application: {e}")
-        QMessageBox.critical(None, "Application Error", f"Failed to start application:\n{str(e)}")
+        QMessageBox.critical(
+            None, "Application Error", f"Failed to start application:\n{str(e)}"
+        )
         sys.exit(1)
 
 

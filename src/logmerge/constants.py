@@ -9,13 +9,13 @@ THREAD_FORCE_TERMINATE_TIMEOUT_MS = 1000
 
 # File colors for log sources
 DEFAULT_FILE_COLORS = [
-    QColor(255, 99, 71),   # Tomato
+    QColor(255, 99, 71),  # Tomato
     QColor(60, 179, 113),  # Medium Sea Green
     QColor(30, 144, 255),  # Dodger Blue
-    QColor(255, 165, 0),   # Orange
+    QColor(255, 165, 0),  # Orange
     QColor(138, 43, 226),  # Blue Violet
-    QColor(220, 20, 60),   # Crimson
-    QColor(0, 191, 255),   # Deep Sky Blue
+    QColor(220, 20, 60),  # Crimson
+    QColor(0, 191, 255),  # Deep Sky Blue
     QColor(255, 20, 147),  # Deep Pink
 ]
 COLOR_LIGHTEN_FACTOR = 0.9

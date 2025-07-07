@@ -8,8 +8,4 @@ from .add_files import AddFilesDialog
 from .file_discovery import FileDiscoveryResultsDialog
 from .column_configuration import ColumnConfigurationDialog
 
-__all__ = [
-    'AddFilesDialog', 
-    'FileDiscoveryResultsDialog',
-    'ColumnConfigurationDialog'
-]
+__all__ = ["AddFilesDialog", "FileDiscoveryResultsDialog", "ColumnConfigurationDialog"]

@@ -39,22 +39,17 @@ __all__ = [
     "__version__",
     "__author__",
     "__email__",
-
     # Core data structures
     "LogEntry",
     "SharedLogBuffer",
-
     # Plugin system
     "LogParsingPlugin",
-
     # Parsing utilities
     "parse_line_with_regex",
     "convert_field_value",
-
     # File monitoring
     "LogParsingWorker",
     "FileMonitorState",
-
     # Main application
     "main",
 ]
