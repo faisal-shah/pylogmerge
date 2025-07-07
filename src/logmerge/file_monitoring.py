@@ -37,17 +37,6 @@ DEFAULT_FILE_ERROR_HANDLING = 'ignore'
 # FILE MONITORING CLASSES
 # ============================================================================
 
-class FileParsingStats:
-    """Statistics for log file parsing."""
-    
-    def __init__(self, file_path: str):
-        self.file_path = file_path
-        self.total_lines = 0
-        self.parsed_lines = 0
-        self.dropped_lines = 0
-        self.is_complete = False
-
-
 class FileMonitorState:
     """State for monitoring a single log file."""
     
@@ -56,7 +45,10 @@ class FileMonitorState:
         self.last_position = 0  # Last read position in file
         self.last_size = 0
         self.last_modified = 0
-        self.stats = FileParsingStats(file_path)
+        self.total_lines = 0
+        self.parsed_lines = 0
+        self.dropped_lines = 0
+        self.is_complete = False
         self.file_handle = None
 
 
@@ -164,15 +156,15 @@ class LogParsingWorker(QThread):
             
             for line in new_lines:                    
                 # Increment line counter
-                state.stats.total_lines += 1
-                line_number = state.stats.total_lines
+                state.total_lines += 1
+                line_number = state.total_lines
                 
                 log_entry = self._parse_line(file_path, line_number, line)
                 if log_entry:
-                    state.stats.parsed_lines += 1
+                    state.parsed_lines += 1
                     new_entries.append(log_entry)
                 else:
-                    state.stats.dropped_lines += 1
+                    state.dropped_lines += 1
             
             # Update position tracking
             state.last_position = state.file_handle.tell()

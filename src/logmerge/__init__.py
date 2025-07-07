@@ -29,7 +29,7 @@ __email__ = "faisal.shah@gmail.com"
 from .data_structures import LogEntry, SharedLogBuffer
 from .plugin_utils import LogParsingPlugin
 from .parsing_utils import parse_line_with_regex, convert_field_value
-from .file_monitoring import LogParsingWorker, FileParsingStats, FileMonitorState
+from .file_monitoring import LogParsingWorker, FileMonitorState
 
 # Main application entry point
 from .main import main
@@ -53,7 +53,6 @@ __all__ = [
 
     # File monitoring
     "LogParsingWorker",
-    "FileParsingStats",
     "FileMonitorState",
 
     # Main application
