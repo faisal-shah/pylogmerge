@@ -19,6 +19,7 @@ from PyQt5.QtWidgets import (
     QDialog,
     QMessageBox,
     QTabWidget,
+    QMenu,
 )
 from PyQt5.QtCore import Qt, QTimer, QEvent
 
@@ -161,8 +162,14 @@ class MergedLogViewer(QMainWindow):
         self.log_table_view.setSelectionBehavior(QTableView.SelectRows)
         self.log_table_view.setSortingEnabled(True)
 
-        # Setup initial header resize modes
-        self.update_header_resize_modes()
+        # Setup initial column widths
+        self.setup_initial_column_widths()
+
+        # Connect double-click for auto-resize
+        header = self.log_table_view.horizontalHeader()
+        header.setContextMenuPolicy(Qt.CustomContextMenu)
+        header.sectionDoubleClicked.connect(self.auto_resize_column)
+        header.customContextMenuRequested.connect(self.show_header_context_menu)
 
         # Connect scroll bar signals for follow mode
         vertical_scrollbar = self.log_table_view.verticalScrollBar()
@@ -378,32 +385,55 @@ class MergedLogViewer(QMainWindow):
             new_config = dialog.get_column_configuration()
             self.log_table_model.update_column_configuration(new_config)
 
-            self.update_header_resize_modes()
+            self.setup_initial_column_widths()
+
+    def setup_initial_column_widths(self) -> None:
+        """Initialize column widths with uniform distribution."""
+        header = self.log_table_view.horizontalHeader()
+        column_count = self.log_table_model.columnCount()
+        
+        if column_count == 0:
+            return
+            
+        # Set all columns to Interactive mode for user resizing
+        for i in range(column_count):
+            header.setSectionResizeMode(i, QHeaderView.Interactive)
+        
+        # Get available width and distribute uniformly
+        # Account for scrollbar and margins (rough estimate)
+        available_width = self.log_table_view.width() - 50
+        if available_width > 0:
+            uniform_width = max(100, available_width // column_count)  # Minimum 100px
+            for i in range(column_count):
+                header.resizeSection(i, uniform_width)
+
+    def auto_resize_column(self, logical_index: int) -> None:
+        """Auto-resize a column to fit its contents (double-click handler)."""
+        self.log_table_view.resizeColumnToContents(logical_index)
+
+    def auto_resize_all_columns(self) -> None:
+        """Auto-resize all columns to fit their contents."""
+        for i in range(self.log_table_model.columnCount()):
+            self.log_table_view.resizeColumnToContents(i)
+
+    def show_header_context_menu(self, position) -> None:
+        """Show context menu for table header."""
+        menu = QMenu(self)
+        
+        auto_resize_action = QAction("Auto-resize All Columns", self)
+        auto_resize_action.triggered.connect(self.auto_resize_all_columns)
+        menu.addAction(auto_resize_action)
+        
+        reset_widths_action = QAction("Reset Column Widths", self)
+        reset_widths_action.triggered.connect(self.setup_initial_column_widths)
+        menu.addAction(reset_widths_action)
+        
+        header = self.log_table_view.horizontalHeader()
+        menu.exec_(header.mapToGlobal(position))
 
     def update_header_resize_modes(self) -> None:
-        """Update table header resize modes to optimize column display."""
-        header = self.log_table_view.horizontalHeader()
-
-        for i in range(self.log_table_model.columnCount()):
-            column_name = self.log_table_model.visible_columns[i]
-
-            if column_name == LogTableModel.SOURCE_FILE_COLUMN:
-                header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-            else:
-                field = next(
-                    (f for f in self.schema.fields if f["name"] == column_name), None
-                )
-                if field:
-                    field_type = field["type"]
-                    if field_type in ["epoch", "strptime"]:
-                        header.setSectionResizeMode(i, QHeaderView.Interactive)
-                        header.resizeSection(i, 150)
-                    elif field_type in ["int", "float"]:
-                        header.setSectionResizeMode(i, QHeaderView.ResizeToContents)
-                    else:
-                        header.setSectionResizeMode(i, QHeaderView.Stretch)
-                else:
-                    header.setSectionResizeMode(i, QHeaderView.Interactive)
+        """Update table header resize modes - simplified to just call setup."""
+        self.setup_initial_column_widths()
 
     def closeEvent(self, event: QEvent) -> None:
         """Handle application close event."""
