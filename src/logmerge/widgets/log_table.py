@@ -123,7 +123,7 @@ class LogTableModel(QAbstractTableModel):
 
     def _get_field_schema(self, field_name: str) -> dict:
         """Get the schema definition for a specific field."""
-        if not self.schema or not hasattr(self.schema, "fields"):
+        if not self.schema:
             return None
 
         for field in self.schema.fields:
@@ -164,10 +164,7 @@ class LogTableModel(QAbstractTableModel):
                         cached_data["formatted_fields"][field_name] = ""
                     else:
                         # Check if this field is an enum and has display mapping
-                        if (
-                            hasattr(self.schema, "enum_display_maps")
-                            and field_name in self.schema.enum_display_maps
-                        ):
+                        if field_name in self.schema.enum_display_maps:
                             # Use pre-built enum display map - O(1) lookup!
                             enum_display_map = self.schema.enum_display_maps[field_name]
                             display_value = enum_display_map.get(
@@ -258,11 +255,15 @@ class LogTableModel(QAbstractTableModel):
         for entry in self.log_entries:
             if field_name in entry.fields:
                 value = entry.fields[field_name]
-                if value is not None:
-                    unique_values.add(value)
+                # Include None/empty values - they are valid filter options
+                unique_values.add(value)
 
-        # Return sorted list for consistent display
-        sorted_values = sorted(list(unique_values))
+        # Return sorted list with None values at the top for easy access
+        sorted_values = []
+        if None in unique_values:
+            sorted_values.append(None)
+        sorted_values.extend(sorted([v for v in unique_values if v is not None]))
+        
         return sorted_values
 
     def clear_entries(self):

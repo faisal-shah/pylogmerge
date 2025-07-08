@@ -89,6 +89,8 @@ def parse_line_with_regex(
             raw_value = match.group(field_name)
 
             if raw_value is None:
+                # Include None values in the fields - they are valid data points
+                converted_fields[field_name] = None
                 continue
 
             try:
@@ -96,8 +98,8 @@ def parse_line_with_regex(
                 converted_value = convert_field_value(raw_value, field)
                 converted_fields[field_name] = converted_value
             except (ValueError, TypeError):
-                # Type conversion failed - skip this field
-                continue
+                # Type conversion failed - treat as None
+                converted_fields[field_name] = None
 
         return converted_fields
 

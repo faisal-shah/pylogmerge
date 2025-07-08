@@ -166,14 +166,24 @@ class DiscreteFilterWidget(FilterWidget):
         """
         )
 
-        # Populate with values
-        for value in self.values:
+        # Populate with values - sort with None at the top for easy access
+        sorted_values = []
+        if None in self.values:
+            sorted_values.append(None)
+        sorted_values.extend(sorted([v for v in self.values if v is not None]))
+        
+        for value in sorted_values:
             if isinstance(value, dict):  # enum format
                 display_text = f"{value['value']} ({value['name']})"
                 item_value = value["value"]
             else:  # simple value
-                display_text = str(value)
-                item_value = value
+                # Handle None/empty values with user-friendly display
+                if value is None:
+                    display_text = "(empty)"
+                    item_value = None
+                else:
+                    display_text = str(value)
+                    item_value = value
 
             item = QListWidgetItem(display_text)
             item.setData(Qt.UserRole, item_value)
@@ -225,9 +235,23 @@ class DiscreteFilterWidget(FilterWidget):
         self.values = values
         self.list_widget.clear()
 
-        for value in values:
-            item = QListWidgetItem(str(value))
-            item.setData(Qt.UserRole, value)
+        # Sort values with None at the top for easy access
+        sorted_values = []
+        if None in values:
+            sorted_values.append(None)
+        sorted_values.extend(sorted([v for v in values if v is not None]))
+
+        for value in sorted_values:
+            # Handle None/empty values with user-friendly display
+            if value is None:
+                display_text = "(empty)"
+                item_value = None
+            else:
+                display_text = str(value)
+                item_value = value
+                
+            item = QListWidgetItem(display_text)
+            item.setData(Qt.UserRole, item_value)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked)
             self.list_widget.addItem(item)
@@ -462,7 +486,7 @@ class FilterPanel(QWidget):
         self.schema = schema
         self.clear_filters()
 
-        if not schema or not hasattr(schema, "fields"):
+        if not schema:
             return
 
         for i, field in enumerate(schema.fields):
@@ -589,7 +613,6 @@ class FilterPanel(QWidget):
         for widget in self.filter_widgets:
             if (
                 isinstance(widget, DiscreteFilterWidget)
-                and hasattr(widget.field_schema, "get")
                 and widget.field_schema.get("is_discrete")
             ):
                 # Get unique values from the log data
@@ -597,6 +620,6 @@ class FilterPanel(QWidget):
                     widget.field_name
                 )
 
-                # Only update if we have new values (avoid unnecessary UI updates)
-                if unique_values and len(unique_values) != widget.list_widget.count():
+                # Always update if we have values (removed the count comparison that was preventing updates)
+                if unique_values:
                     widget.set_available_values(unique_values)
