@@ -160,4 +160,18 @@ Add these badges to your README.md:
    - Currently set to continue on error due to PyQt5 compatibility
    - Add type stubs or ignore patterns as needed
 
+5. **Deprecated action warnings:**
+   - The workflows use the latest action versions (as of July 2025):
+     - `actions/checkout@v4`
+     - `actions/setup-python@v5`
+     - `actions/cache@v4`
+     - `actions/upload-artifact@v4`
+     - `softprops/action-gh-release@v2`
+   - If you see deprecation warnings, check for newer versions
+
+### Recent Updates:
+
+- **July 2025:** Updated all GitHub Actions to latest versions to fix deprecation warnings
+- Actions updated: setup-python (v4→v5), cache (v3→v4), upload-artifact (v3→v4), gh-release (v1→v2)
+
 For more help, check the GitHub Actions logs or open an issue.
