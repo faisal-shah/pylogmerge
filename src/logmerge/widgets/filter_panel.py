@@ -631,4 +631,26 @@ class FilterPanel(QWidget):
 
                 # Always update if we have values (removed the count comparison that was preventing updates)
                 if unique_values:
+                    prev_checked = {}
+                    prev_selected = set()
+                    lw = widget.list_widget
+                    for i in range(lw.count()):
+                        item = lw.item(i)
+                        value = item.data(Qt.UserRole)
+                        prev_checked[item.data(Qt.UserRole)] = item.checkState() == Qt.Checked
+                        if item.isSelected():
+                            prev_selected.add(value)
+
                     widget.set_available_values(unique_values)
+
+                    for i in range(lw.count()):
+                        item = lw.item(i)
+                        value = item.data(Qt.UserRole)
+                        if value in prev_checked:
+                            item.setCheckState(
+                                Qt.Checked if prev_checked[value] else Qt.Unchecked
+                            )
+                        else:
+                            item.setCheckState(Qt.Unchecked)
+                        
+                        item.setSelected(value in prev_selected)

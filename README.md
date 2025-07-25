@@ -135,7 +135,7 @@ def parse_raw_line(line: str) -> dict | None:
     parts = line.strip().split(',')
     if len(parts) != 3:
         return None
-    
+
     try:
         return {
             "Timestamp": float(parts[0]),
@@ -185,7 +185,7 @@ Polling         Parsing            Batching    Draining    Rendering
 #### 1. **File Monitoring System** (`file_monitoring.py`)
 - **Thread**: Runs in a separate `LogParsingWorker` thread
 - **Polling Frequency**: 1 second (configurable via `DEFAULT_POLL_INTERVAL_SECONDS`)
-- **Operation**: 
+- **Operation**:
   - Monitors file size and modification time for each added log file
   - Maintains file handles and tracks last read position (`FileMonitorState`)
   - Reads only new lines since last poll using `file.readlines()`
