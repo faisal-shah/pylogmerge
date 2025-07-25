@@ -12,6 +12,20 @@ A GUI application for viewing and analyzing multiple log files with advanced fil
 - Color-coded file identification for easy visual distinction.
 - Configurable column display and ordering.
 
+## Screenshots
+
+### File Selection
+
+![File Selection Screen](docs/images/pylogmerge-file-selection-screen.png)
+
+### Filter Panel
+
+![Filter Panel Screen](docs/images/pylogmerge-filter-screen.png)
+
+## Usage Video
+
+Watch a quick usage demo here: [LogMerge Usage Video](https://youtu.be/37V_kZO2TLA)
+
 ## Future Work
 
 The following features are being considered for future releases:
