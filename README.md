@@ -37,12 +37,16 @@ The following features are being considered for future releases:
 
 ## Installation
 
-### Prerequisites
 
-- Python 3.10 or higher
-- Make
+### Installation
 
-### Setup
+You can install LogMerge directly from [PyPI](https://pypi.org/project/logmerge/):
+
+```bash
+pip install logmerge
+```
+
+Or, to install from source:
 
 1.  **Clone the repository:**
     ```bash
@@ -56,8 +60,7 @@ The following features are being considered for future releases:
     ```
     This command will set up a virtual environment, install dependencies, and build the distribution package. The resulting `.whl` file will be located in the `dist/` directory.
 
-3. **Install the package:**
-   After building, install the package using pip. Make sure to activate your virtual environment if you are using one.
+3. **Install the package from the built wheel:**
    ```bash
    pip install dist/*.whl
    ```
